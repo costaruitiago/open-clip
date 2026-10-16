@@ -39,6 +39,7 @@ def free_port() -> int:
 
 UPLOAD = "https://www.googleapis.com/auth/youtube.upload"
 READONLY = "https://www.googleapis.com/auth/youtube.readonly"
+FORCE_SSL = "https://www.googleapis.com/auth/youtube.force-ssl"
 
 
 def write_token(directory, scopes, refresh_token="refresh-1"):
@@ -74,7 +75,7 @@ def test_a_token_without_the_read_scope_is_connected_but_short_of_one(tmp_path):
     # Uploads work on this token. What it cannot do is be asked whether a video
     # has finished processing, which is what decides when a thumbnail is safe
     # to attach.
-    path = write_token(tmp_path, [UPLOAD])
+    path = write_token(tmp_path, [UPLOAD, FORCE_SSL])
 
     status = token_status(path)
 
@@ -82,8 +83,19 @@ def test_a_token_without_the_read_scope_is_connected_but_short_of_one(tmp_path):
     assert status["missing_scopes"] == [READONLY]
 
 
-def test_a_fully_authorised_token_is_missing_nothing(tmp_path):
+def test_a_token_from_before_replacing_is_short_of_the_delete_scope(tmp_path):
+    # Still uploads; what it cannot do is take the old video down when a clip
+    # is regenerated, so Settings has to ask for the channel to be connected again.
     path = write_token(tmp_path, [UPLOAD, READONLY])
+
+    status = token_status(path)
+
+    assert status["connected"] is True
+    assert status["missing_scopes"] == [FORCE_SSL]
+
+
+def test_a_fully_authorised_token_is_missing_nothing(tmp_path):
+    path = write_token(tmp_path, [UPLOAD, READONLY, FORCE_SSL])
 
     status = token_status(path)
 

@@ -39,6 +39,49 @@ def write_token(directory):
     return path
 
 
+def client_whose_delete(raises=None):
+    """A client whose `videos().delete().execute()` raises `raises`, or succeeds."""
+    class Request:
+        def execute(self):
+            if raises:
+                raise raises
+
+    class Videos:
+        def delete(self, id):
+            return Request()
+
+    class Service:
+        def videos(self):
+            return Videos()
+
+    client = YoutubeClient.__new__(YoutubeClient)
+    client.service = Service()
+    return client
+
+
+def http_error(status):
+    import httplib2
+    from googleapiclient.errors import HttpError
+
+    return HttpError(httplib2.Response({"status": status}), b"{}")
+
+
+def test_deleting_a_video_reports_it_went():
+    assert client_whose_delete().delete_video("vid-old") is True
+
+
+def test_deleting_a_video_that_is_already_gone_is_not_a_failure():
+    # Somebody took it down in YouTube Studio first: the outcome asked for.
+    assert client_whose_delete(http_error(404)).delete_video("vid-old") is False
+
+
+def test_any_other_refusal_to_delete_still_raises():
+    from googleapiclient.errors import HttpError
+
+    with pytest.raises(HttpError):
+        client_whose_delete(http_error(403)).delete_video("vid-old")
+
+
 class StubCredentials:
     """An expired token that still holds a refresh token, like the real one."""
 

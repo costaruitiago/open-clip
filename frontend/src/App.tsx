@@ -56,6 +56,9 @@ export default function App() {
     projectId: '',
     projectName: '',
   });
+  // Upload asks first: regenerate every clip and replace its YouTube video, or
+  // publish only what is not up yet.
+  const [confirmUpload, setConfirmUpload] = useState(false);
 
   useEffect(() => {
     setCookie('app-theme', theme);
@@ -171,8 +174,8 @@ export default function App() {
 
 
   const stepMutation = useMutation({
-    mutationFn: ({ action, step }: { action: 'START' | 'STOP', step: string }) => 
-      executePipelineStep(projectId!, step, action),
+    mutationFn: ({ action, step, regenerate = false }: { action: 'START' | 'STOP', step: string, regenerate?: boolean }) =>
+      executePipelineStep(projectId!, step, action, regenerate),
     onSuccess: () => {
       // Aggressively invalidate to ensure UI sync. ProjectDetail keys its own
       // metadata/status queries separately, so they need invalidating too.
@@ -194,9 +197,31 @@ export default function App() {
   // rebuilt here on every poll tick would make the memo a no-op. `mutate` is
   // itself stable across renders, so the project id is the only real dependency.
   const handleExecuteAction = useCallback(
-    (action: 'START' | 'STOP', step: string) => stepMutation.mutate({ action, step }),
+    (action: 'START' | 'STOP', step: string) => {
+      if (action === 'START' && step === 'upload') {
+        setConfirmUpload(true);
+        return;
+      }
+      stepMutation.mutate({ action, step });
+    },
     [stepMutation]
   );
+
+  const startUpload = (regenerate: boolean) => {
+    setConfirmUpload(false);
+    stepMutation.mutate({ action: 'START', step: 'upload', regenerate });
+  };
+
+  // Said in the dialog rather than discovered afterwards: these are the clips
+  // that uploading without regenerating will leave as they are.
+  const clipTotal = projectMetadata?.highlights?.length ?? 0;
+  const alreadyLive = projectMetadata?.highlights?.filter((h) => h.youtube_video_id).length ?? 0;
+  const uploadMessage =
+    'Regenerate re-cuts every clip with the current settings and uploads it, then deletes the ' +
+    'clip’s old YouTube video — its views and comments go with it. ' +
+    (alreadyLive > 0
+      ? `Uploading without regenerating skips the ${alreadyLive} of ${clipTotal} clip${clipTotal === 1 ? '' : 's'} already on YouTube; only the rest go up.`
+      : 'No clip is on YouTube yet, so either choice uploads all of them.');
 
   const handleDeleteClip = useCallback(
     (index: number) => deleteClipMutation.mutate({ projectId: projectId!, clipIndex: index }),
@@ -445,6 +470,15 @@ export default function App() {
           deleteProjectMutation.mutate(confirmDeleteProject.projectId);
         }}
         onCancel={() => setConfirmDeleteProject({ isOpen: false, projectId: '', projectName: '' })}
+      />
+      <ConfirmationModal
+        isOpen={confirmUpload}
+        title="Regenerate clips?"
+        message={uploadMessage}
+        confirmText="Regenerate & replace"
+        alternative={{ text: 'Upload without regenerating', onClick: () => startUpload(false) }}
+        onConfirm={() => startUpload(true)}
+        onCancel={() => setConfirmUpload(false)}
       />
       <ThemeToggle theme={theme} setTheme={setTheme} />
     </div>

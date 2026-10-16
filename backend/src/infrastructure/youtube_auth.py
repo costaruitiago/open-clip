@@ -45,9 +45,13 @@ logger = logging.getLogger(__name__)
 # YouTube generates, so the set has to wait for an answer only this scope can
 # get. A token authorised before this scope was added still uploads; it just
 # cannot be told when to attach the picture, and falls back to guessing.
+#
+# force-ssl is what lets an upload replace a clip's video: the new cut goes up
+# and the old video is deleted, which neither of the other two allows.
 SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",
     "https://www.googleapis.com/auth/youtube.readonly",
+    "https://www.googleapis.com/auth/youtube.force-ssl",
 ]
 DEFAULT_TOKEN_PATH = Path("backend/youtube_credentials/youtube_credentials.json")
 DEFAULT_CALLBACK_PORT = 8090

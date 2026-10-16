@@ -75,6 +75,33 @@ def read_metadata() -> dict:
 
 # --- Which highlights still need cutting ------------------------------------
 
+def test_a_cut_under_the_current_settings_matches(project_root):
+    write_project(project_root, [cut(0) | {"rendered_aspect_ratio": "9:16", "rendered_resolution": "1080p"}])
+    project = Project(PROJECT_ID)
+    assert Clipper.matches_output(project, project.highlights[0]) is True
+
+
+def test_a_crop_cut_does_not_match_a_stacked_project(project_root):
+    """Switching to stacked has to re-cut on resume, or the files stay crops."""
+    write_project(project_root, [cut(0) | {"rendered_aspect_ratio": "9:16", "rendered_resolution": "1080p"}])
+    project = Project(PROJECT_ID)
+    project.settings.layout = "stacked"
+    assert Clipper.matches_output(project, project.highlights[0]) is False
+
+
+def test_a_cut_under_another_ratio_does_not_match(project_root):
+    write_project(project_root, [cut(0) | {"rendered_aspect_ratio": "16:9", "rendered_resolution": "1080p"}])
+    project = Project(PROJECT_ID)
+    assert Clipper.matches_output(project, project.highlights[0]) is False
+
+
+def test_a_cut_that_recorded_nothing_is_taken_at_its_word(project_root):
+    write_project(project_root, [cut(0)])
+    project = Project(PROJECT_ID)
+    project.settings.layout = "stacked"
+    assert Clipper.matches_output(project, project.highlights[0]) is True
+
+
 def test_a_highlight_with_its_file_on_disk_is_already_cut(project_root):
     project_dir = write_project(project_root, [cut(0)])
     write_clip(project_dir, 0)

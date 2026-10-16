@@ -437,7 +437,30 @@ class Uploader:
         highlight.upload_error = None
         project.set_property("highlights", highlights)
 
-    async def execute(self, project: Project, full: bool = False) -> List[Dict[str, Any]]:  # pragma: no cover
+    def replace_one(self, project: Project, index: int, client: YoutubeClient) -> Dict[str, Any]:
+        """Publishes this clip afresh and deletes the video it had before.
+
+        New first, old second: an upload that fails leaves the old video up
+        rather than leaving the clip with no video at all. A delete that fails
+        leaves both up, and the clip says so — the new one is live, so this is
+        not a failed upload, but the old one has to come down by hand.
+        """
+        old_id = project.highlights[index].youtube_video_id
+        result = self.upload_one(project, index, client=client)
+        if old_id and old_id != result.get("video_id"):
+            try:
+                client.delete_video(old_id)
+                logger.info(f"Replaced {old_id} with {result.get('video_id')} for clip {index}")
+            except Exception as e:
+                self._set_upload_error(
+                    project, index,
+                    f"The new cut is live, but the old video ({old_id}) could not be deleted: "
+                    f"{str(e) or e.__class__.__name__}. Delete it in YouTube Studio.",
+                )
+        return result
+
+    async def execute(self, project: Project, full: bool = False,
+                      replace: bool = False) -> List[Dict[str, Any]]:  # pragma: no cover
         """Publishes the project's clips to YouTube, as a pipeline step.
 
         `full` publishes every highlight, including the ones already live —
@@ -445,6 +468,10 @@ class Uploader:
         is a resume: a clip that already has a video is left alone and only the
         ones still unpublished go up, so pressing the step again after three of
         twenty failed publishes three clips rather than seventeen duplicates.
+
+        `replace` is the user choosing to regenerate: every clip is re-cut and
+        published, and a clip that already had a video has that video deleted
+        once the new one is up.
         """
         logger.info(f"Uploader executing for project={project.project_id}, highlight_count={len(project.highlights)}")
         self.start_service(project, full=full)
@@ -453,6 +480,17 @@ class Uploader:
         # Through the factory rather than `YoutubeClient()` directly, so this
         # loop can be driven in a test without an OAuth token.
         client = self.open_client()
+
+        # Refused before anything is cut or published: without the delete
+        # permission every replacement would be a duplicate.
+        if replace and any(self.is_published(h) for h in project.highlights) and not client.can_delete():
+            project.fail_step(
+                "upload",
+                "Replacing a clip's YouTube video needs permission to delete videos, which this "
+                "channel's authorisation does not have. Open Settings and connect the channel "
+                "again, then press Upload and choose Regenerate.",
+            )
+            return []
 
         uploads_list = []
         failures: List[str] = []
@@ -465,7 +503,7 @@ class Uploader:
         # Indexes, not the highlights themselves: each upload is written back
         # onto its highlight, which reloads the list from disk.
         for index in range(total):
-            if not full and self.is_published(project.highlights[index]):
+            if not (full or replace) and self.is_published(project.highlights[index]):
                 # Already on YouTube. Publishing it again does not replace that
                 # video, it makes a second one — and nothing in this app can
                 # take either of them down.
@@ -473,7 +511,10 @@ class Uploader:
                 continue
             report(f"Clip {index + 1} of {total}: cutting, then publishing")
             try:
-                uploads_list.append(self.upload_one(project, index, client=client))
+                if replace:
+                    uploads_list.append(self.replace_one(project, index, client))
+                else:
+                    uploads_list.append(self.upload_one(project, index, client=client))
             except Exception as e:
                 # One clip that will not cut or will not publish must not
                 # abandon the clips after it; the step is judged on how many of

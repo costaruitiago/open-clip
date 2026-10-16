@@ -2,6 +2,7 @@ import logging
 import os
 from pathlib import Path
 import googleapiclient.discovery
+import googleapiclient.errors
 import googleapiclient.http
 from google.oauth2.credentials import Credentials
 from google.auth.exceptions import RefreshError
@@ -16,6 +17,16 @@ logger = logging.getLogger(__name__)
 # Any of these lets `videos.list` be called for the channel's own uploads.
 READ_SCOPES = {
     "https://www.googleapis.com/auth/youtube.readonly",
+    "https://www.googleapis.com/auth/youtube",
+    "https://www.googleapis.com/auth/youtube.force-ssl",
+    "https://www.googleapis.com/auth/youtubepartner",
+}
+
+
+# Any of these lets `videos.delete` remove one of the channel's own uploads.
+# Neither upload nor readonly does, so a token from before replacing existed
+# has to be authorised again before it can replace anything.
+DELETE_SCOPES = {
     "https://www.googleapis.com/auth/youtube",
     "https://www.googleapis.com/auth/youtube.force-ssl",
     "https://www.googleapis.com/auth/youtubepartner",
@@ -93,6 +104,26 @@ class YoutubeClient:
     def can_read_processing(self) -> bool:
         """Whether this token may ask YouTube about the channel's own videos."""
         return bool(READ_SCOPES & set(self.scopes))
+
+    def can_delete(self) -> bool:
+        """Whether this token may take one of the channel's videos down."""
+        return bool(DELETE_SCOPES & set(self.scopes))
+
+    def delete_video(self, video_id: str) -> bool:
+        """Removes a video from the channel, for good.
+
+        Returns False when YouTube has no such video — somebody already deleted
+        it, which is the outcome asked for rather than a failure. Raises on any
+        other refusal.
+        """
+        try:
+            self.service.videos().delete(id=video_id).execute()
+        except googleapiclient.errors.HttpError as e:
+            if getattr(e.resp, "status", None) == 404:
+                logger.info(f"{video_id} is already gone from YouTube; nothing to delete")
+                return False
+            raise
+        return True
 
     def video_exists(self, video_id: str) -> Optional[bool]:
         """Whether this channel can still see the video behind an id.

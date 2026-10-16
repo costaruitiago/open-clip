@@ -960,7 +960,9 @@ class SimpleHandler(BaseHTTPRequestHandler):
         if step == 'all' and action == 'START':
             pipeline_orchestrator.run_pipeline(project_id)
         elif action == 'START':
-            pipeline_orchestrator.run_step(project_id, step)
+            # Set when the user chose to regenerate on Upload: every clip is
+            # re-cut and its old YouTube video replaced.
+            pipeline_orchestrator.run_step(project_id, step, replace=bool(data.get('regenerate')))
         
         self.send_json_response({"status": "started"})
 

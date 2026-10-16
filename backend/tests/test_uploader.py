@@ -125,6 +125,18 @@ class FakeYoutube:
         self.exists_calls.append(video_id)
         return self.exists
 
+    # Whether the token could delete, and what was deleted with it.
+    deletable = True
+    delete_error = None
+
+    def can_delete(self):
+        return self.deletable
+
+    def delete_video(self, video_id):
+        if self.delete_error:
+            raise self.delete_error
+        self.deleted = getattr(self, "deleted", []) + [video_id]
+
 
 def highlight(**overrides):
     data = {
@@ -492,10 +504,60 @@ def test_no_highlight_at_that_index_is_refused_before_a_job_is_registered(projec
 
 # --- The step across the whole project --------------------------------------
 
-def run_step(service, full=False):
+def run_step(service, full=False, replace=False):
     import asyncio
 
-    return asyncio.run(service.execute(Project(PROJECT_ID), full=full))
+    return asyncio.run(service.execute(Project(PROJECT_ID), full=full, replace=replace))
+
+
+def test_regenerating_replaces_every_clip_s_video(project_root):
+    # The new cut goes up, then the old video comes down: one video per clip.
+    project_dir = write_project(project_root, [
+        highlight(youtube_video_id="vid-old", youtube_url="https://youtu.be/vid-old"),
+        highlight(),
+    ])
+    client = FakeYoutube()
+
+    assert len(run_step(uploader(project_dir, client_factory=lambda: client), replace=True)) == 2
+
+    assert len(client.calls) == 2
+    assert client.deleted == ["vid-old"]
+    metadata = read_metadata()
+    assert metadata["highlights"][0]["youtube_video_id"] == "vid-1"
+    assert metadata["step_statuses"]["upload"] == "completed"
+
+
+def test_regenerating_without_delete_permission_publishes_nothing(project_root):
+    # Every replacement would be a duplicate, so nothing is cut or sent.
+    project_dir = write_project(project_root, [
+        highlight(youtube_video_id="vid-old", youtube_url="https://youtu.be/vid-old"),
+    ])
+    client = FakeYoutube()
+    client.deletable = False
+
+    assert run_step(uploader(project_dir, client_factory=lambda: client), replace=True) == []
+
+    assert client.calls == []
+    metadata = read_metadata()
+    assert metadata["step_statuses"]["upload"] == "error"
+    assert "connect the channel again" in metadata["step_errors"]["upload"]
+
+
+def test_an_old_video_that_will_not_delete_is_reported_on_the_clip(project_root):
+    project_dir = write_project(project_root, [
+        highlight(youtube_video_id="vid-old", youtube_url="https://youtu.be/vid-old"),
+    ])
+    client = FakeYoutube()
+    client.delete_error = RuntimeError("quota exceeded")
+
+    run_step(uploader(project_dir, client_factory=lambda: client), replace=True)
+
+    stored = read_metadata()["highlights"][0]
+    # The new cut is live, so this is not a failed upload — but the old one
+    # has to come down by hand, and the clip is where that is said.
+    assert stored["youtube_video_id"] == "vid-1"
+    assert "vid-old" in stored["upload_error"]
+    assert "quota exceeded" in stored["upload_error"]
 
 
 def test_a_second_press_publishes_only_the_clips_with_no_video(project_root):

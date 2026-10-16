@@ -64,6 +64,24 @@ class Clipper:
         )
         return path.exists()
 
+    @staticmethod
+    def matches_output(project: Project, highlight: Highlight) -> bool:
+        """Whether this highlight's cut was made with the output settings now in force.
+
+        Mirrors `matchesOutputSettings` on the page. A file that recorded no
+        geometry was cut before it was tracked and is taken at its word, and an
+        unrecorded layout was always a crop.
+        """
+        if highlight.rendered_aspect_ratio is None and highlight.rendered_resolution is None:
+            return True
+        choice = lambda value: (value or "").strip() or "keep original"
+        settings = project.settings
+        return (
+            choice(highlight.rendered_aspect_ratio) == choice(settings.aspect_ratio)
+            and choice(highlight.rendered_resolution) == choice(settings.resolution)
+            and (highlight.rendered_layout or "crop") == (settings.layout or "crop")
+        )
+
     def _write_captions(self, project: Project, highlight, clips_dir: str, clip_filename: str,
                         width: int, height: int) -> Optional[str]:
         """Writes the clip's .ass file next to it and returns its path.
@@ -176,7 +194,10 @@ class Clipper:
             # back onto its highlight, which reloads the list from disk.
             for i in range(total):
                 short = project.highlights[i]
-                if not full and self.has_clip(project, short):
+                # A file cut under other output settings is not this project's
+                # clip any more — the page already calls it stale — so a resume
+                # re-cuts it rather than counting it done.
+                if not full and self.has_clip(project, short) and self.matches_output(project, short):
                     skipped += 1
                     continue
                 report(f"Cutting clip {i + 1} of {total}")

@@ -9,6 +9,8 @@ interface ConfirmationModalProps {
   onCancel: () => void;
   confirmText?: string;
   cancelText?: string;
+  /** A third, non-destructive way forward, shown between Cancel and Confirm. */
+  alternative?: { text: string; onClick: () => void };
 }
 
 export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
@@ -19,6 +21,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   onCancel,
   confirmText = 'CONFIRM',
   cancelText = 'CANCEL',
+  alternative,
 }) => {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -129,8 +132,9 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         </p>
         <div style={{ 
           display: 'flex', 
-          justifyContent: 'flex-end', 
-          gap: 'var(--space-md)' 
+          justifyContent: 'flex-end',
+          flexWrap: 'wrap',
+          gap: 'var(--space-md)'
         }}>
           {/* The design system's own button classes rather than inline hover
               handlers. Those set styles imperatively on mouseenter and undid
@@ -145,6 +149,15 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           >
             {cancelText}
           </button>
+          {alternative && (
+            <button
+              onClick={alternative.onClick}
+              className="btn-ghost btn-md"
+              style={{ fontSize: '0.9rem', minHeight: '44px' }}
+            >
+              {alternative.text}
+            </button>
+          )}
           <button
             onClick={onConfirm}
             className="btn-danger btn-md"

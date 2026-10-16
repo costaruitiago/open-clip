@@ -910,10 +910,19 @@ export const getActiveProcesses = async (): Promise<string[]> => {
   return apiRequest('/active_processes');
 };
 
-export const executePipelineStep = async (projectId: string, step: string, action: 'START' | 'STOP') => {
+/**
+ * `regenerate` is only meaningful for the upload step: every clip is re-cut and
+ * its existing YouTube video replaced by the new one.
+ */
+export const executePipelineStep = async (
+  projectId: string,
+  step: string,
+  action: 'START' | 'STOP',
+  regenerate = false
+) => {
   return apiRequest('/project/step', {
     method: 'POST',
-    body: JSON.stringify({ project_id: projectId, step, action }),
+    body: JSON.stringify({ project_id: projectId, step, action, ...(regenerate ? { regenerate: true } : {}) }),
   });
 };
 

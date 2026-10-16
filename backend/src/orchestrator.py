@@ -112,7 +112,8 @@ class PipelineOrchestrator:
             logger.info(f"Registered LLM task '{name}' from {task.template} as a pipeline step")
         return config
 
-    def _exec_service(self, project: Project, step_name: str, full: bool = False):
+    def _exec_service(self, project: Project, step_name: str, full: bool = False,
+                      replace: bool = False):
         """Helper to run service execution synchronously within a thread.
 
         `full` is offered to the services that know what it means — the ones
@@ -124,11 +125,11 @@ class PipelineOrchestrator:
         if service:
             import asyncio
             import inspect
-            kwargs = (
-                {"full": full}
-                if "full" in inspect.signature(service.execute).parameters
-                else {}
-            )
+            parameters = inspect.signature(service.execute).parameters
+            kwargs = {"full": full} if "full" in parameters else {}
+            # Only the upload knows what replacing is; offered the same way.
+            if replace and "replace" in parameters:
+                kwargs["replace"] = True
             if inspect.iscoroutinefunction(service.execute):
                 asyncio.run(service.execute(project, **kwargs))
             else:
@@ -265,7 +266,7 @@ class PipelineOrchestrator:
             project.set_step_status(name, "todo")
             logger.info(f"Reset step '{name}' for {project.project_id}: '{step_name}' is re-running")
 
-    def run_step(self, project_id: str, step_name: str, full: bool = False):
+    def run_step(self, project_id: str, step_name: str, full: bool = False, replace: bool = False):
         """Triggers a step in the background.
 
         A step pressed on its own resumes: it does the work still missing and
@@ -293,7 +294,7 @@ class PipelineOrchestrator:
                 # step's own entry, which is what /execution_status hands to
                 # the page while the step runs.
                 with reporting_to(lambda message: self._note_progress(key, message)):
-                    self._exec_service(project, step_name, full=full)
+                    self._exec_service(project, step_name, full=full, replace=replace)
             except Exception as e:
                 logger.exception(f"Step {step_name} failed for project {project_id}")
                 self._record_step_failure(project_id, step_name, e)
