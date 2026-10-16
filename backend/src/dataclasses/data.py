@@ -899,17 +899,31 @@ class UploadSettings:
 CLIP_PREVIEW_CHOICES = ("thumbnail", "video")
 
 # How a widescreen source fills a taller frame: one window cropped around the
-# subject, or the whole frame in the middle with darkened copies of it stacked
-# above and below.
-LAYOUT_CHOICES = ("crop", "stacked")
+# subject, the whole frame in the middle with darkened copies of it stacked
+# above and below, or the source cut into a left and a right part stacked one
+# above the other — two people side by side become two people one on top.
+LAYOUT_CHOICES = ("crop", "stacked", "split")
 DEFAULT_STACK_DARKNESS = 50
+DEFAULT_SPLIT_POSITION = 50
+# Past these the narrower part is a sliver, cropped to almost nothing in height.
+SPLIT_POSITION_RANGE = (20, 80)
+
+
+def _as_clamped_int(value: Any, low: int, high: int, fallback: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return fallback
+    return max(low, min(int(value), high))
 
 
 def as_stack_darkness(value: Any, fallback: int = DEFAULT_STACK_DARKNESS) -> int:
     """A darkness percentage clamped to 0-100, or `fallback` for anything else."""
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        return fallback
-    return max(0, min(int(value), 100))
+    return _as_clamped_int(value, 0, 100, fallback)
+
+
+def as_split_position(value: Any, fallback: int = DEFAULT_SPLIT_POSITION) -> int:
+    """Where the source is cut, as a percentage of its width from the left,
+    clamped to SPLIT_POSITION_RANGE, or `fallback` for anything else."""
+    return _as_clamped_int(value, *SPLIT_POSITION_RANGE, fallback)
 
 
 @dataclass
@@ -951,6 +965,12 @@ class ProjectSettings:
     # How dark the stacked bands are drawn, as a percentage: 0 leaves them at
     # full brightness, 100 is black.
     stack_darkness: int = DEFAULT_STACK_DARKNESS
+    # The split layout: where the source is cut (percent of its width from the
+    # left), whether the right part goes on top instead of the left, and
+    # whether a line is drawn along the seam.
+    split_position: int = DEFAULT_SPLIT_POSITION
+    split_swap: bool = False
+    split_divider: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -981,6 +1001,9 @@ class ProjectSettings:
             clip_preview=preview if preview in CLIP_PREVIEW_CHOICES else "thumbnail",
             layout=data.get("layout") if data.get("layout") in LAYOUT_CHOICES else "crop",
             stack_darkness=as_stack_darkness(data.get("stack_darkness")),
+            split_position=as_split_position(data.get("split_position")),
+            split_swap=data.get("split_swap") is True,
+            split_divider=data.get("split_divider") is True,
         )
 
 @dataclass

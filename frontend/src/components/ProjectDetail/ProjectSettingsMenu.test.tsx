@@ -140,6 +140,27 @@ describe('ProjectSettingsMenu', () => {
     );
   });
 
+  it('offers the split controls only once the layout is split', async () => {
+    const { updateProjectSettings } = await import('../../api');
+    renderMenu();
+    expect(screen.queryByLabelText(/Split at/i)).toBeNull();
+
+    fireEvent.change(screen.getByLabelText(/Layout/i), { target: { value: 'split' } });
+    await waitFor(() =>
+      expect(vi.mocked(updateProjectSettings)).toHaveBeenCalledWith('p1', { layout: 'split' })
+    );
+    expect(screen.queryByLabelText(/Band darkness/i)).toBeNull();
+
+    fireEvent.change(await screen.findByLabelText(/Split at/i), { target: { value: '40' } });
+    fireEvent.click(screen.getByLabelText(/Right part on top/i));
+    fireEvent.click(screen.getByLabelText(/Divider line/i));
+    await waitFor(() => {
+      expect(vi.mocked(updateProjectSettings)).toHaveBeenCalledWith('p1', { split_position: 40 });
+      expect(vi.mocked(updateProjectSettings)).toHaveBeenCalledWith('p1', { split_swap: true });
+      expect(vi.mocked(updateProjectSettings)).toHaveBeenCalledWith('p1', { split_divider: true });
+    });
+  });
+
   it('keeps a darkness of zero rather than reading it as unset', () => {
     renderMenu(metadata({ settings: { resolution: '1080p', aspect_ratio: '9:16', layout: 'stacked', stack_darkness: 0 } }));
 

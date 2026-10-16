@@ -135,6 +135,9 @@ class Clipper:
             subtitle_path=subtitle_path,
             layout=project.settings.layout,
             stack_darkness=project.settings.stack_darkness,
+            split_position=project.settings.split_position,
+            split_swap=project.settings.split_swap,
+            split_divider=project.settings.split_divider,
         )
 
         highlight.is_clip_generated = True

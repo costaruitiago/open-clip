@@ -239,8 +239,11 @@ const ClipCard: React.FC<ClipProps> = ({ projectId, clip, sourceUrl, aspectRatio
     // remount of the grid refetched all of them.
     staleTime: 5 * 60_000,
   });
-  // A file with captions already in it must not get them drawn again.
-  const overlayCues = captions && captions.cues.length > 0 && !clip.captionsBurned ? captions : null;
+  // A file with captions already in it must not get them drawn again. A stale
+  // file is not what plays, though: the card previews the source then, and the
+  // source has no captions in it.
+  const overlayCues =
+    captions && captions.cues.length > 0 && (!playsRendered || !clip.captionsBurned) ? captions : null;
 
   // Which frame the thumbnail is, and what it says. Asked for only when the
   // project shows thumbnails, and only once the card is worth drawing at all.
@@ -272,7 +275,7 @@ const ClipCard: React.FC<ClipProps> = ({ projectId, clip, sourceUrl, aspectRatio
   const showTitle =
     hasTitle &&
     overlayText.enabled &&
-    (isEditingOverlay || !clip.overlayBurned);
+    (isEditingOverlay || !playsRendered || !clip.overlayBurned);
 
   // What the caption dialog places its captions on. The cut file when there is
   // one and it is still clean; otherwise the source inside this highlight's

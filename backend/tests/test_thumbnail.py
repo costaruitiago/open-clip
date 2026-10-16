@@ -81,11 +81,13 @@ class FakeEngine:
         return 1080, 1920
 
     def extract_frame(self, input_path, output_path, timestamp, aspect_ratio, resolution,
-                      subtitle_path=None, framing_timestamp=None, layout="crop", stack_darkness=50):
+                      subtitle_path=None, framing_timestamp=None, layout="crop", stack_darkness=50,
+                      split_position=50, split_swap=False, split_divider=False):
         self.frames.append({
             "output": output_path, "timestamp": timestamp,
             "subtitle_path": subtitle_path, "framing_timestamp": framing_timestamp,
             "layout": layout, "stack_darkness": stack_darkness,
+            "split_position": split_position, "split_swap": split_swap, "split_divider": split_divider,
             # Read here rather than after the fact: the script is scratch for
             # this one call and is deleted as soon as it returns.
             "subtitles": Path(subtitle_path).read_text() if subtitle_path else None,

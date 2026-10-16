@@ -9,10 +9,14 @@ beforeEach(() => {
   Object.defineProperty(HTMLVideoElement.prototype, 'videoHeight', { configurable: true, get: () => 1080 });
 });
 
-const renderPlayer = (layout: { layout?: string; stack_darkness?: number }, isPreview = true) => {
+const renderPlayer = (
+  layout: { layout?: string; stack_darkness?: number; split_divider?: boolean },
+  isPreview = true,
+  aspectRatio = 9 / 16
+) => {
   const result = render(
     <StackLayoutContext.Provider value={stackLayoutFor(layout)}>
-      <ClipPlayer src="/original.mp4" start={0} end={10} aspectRatio={9 / 16} isPreview={isPreview} label="a clip" />
+      <ClipPlayer src="/original.mp4" start={0} end={10} aspectRatio={aspectRatio} isPreview={isPreview} label="a clip" />
     </StackLayoutContext.Provider>
   );
   fireEvent.loadedMetadata(document.querySelector('video') as HTMLVideoElement);
@@ -48,6 +52,35 @@ describe('stacked preview', () => {
 
   it('leaves a cut file alone, which already carries its bands', () => {
     const { container } = renderPlayer({ layout: 'stacked' }, false);
+
+    expect(container.querySelectorAll('canvas')).toHaveLength(0);
+  });
+});
+
+describe('split preview', () => {
+  it('reads the split settings, clamping the position', () => {
+    expect(stackLayoutFor({ layout: 'split', split_position: 95, split_swap: true })).toEqual({
+      kind: 'split', position: 0.8, swap: true, divider: false,
+    });
+  });
+
+  it('covers the frame with two halves when the project splits', () => {
+    const { container } = renderPlayer({ layout: 'split' });
+
+    const canvases = container.querySelectorAll('canvas');
+    expect(canvases).toHaveLength(2);
+    canvases.forEach((canvas) => expect(canvas.style.height).toBe('50%'));
+  });
+
+  it('draws the divider only when asked', () => {
+    expect(renderPlayer({ layout: 'split' }).container.querySelectorAll('div[aria-hidden="true"]')).toHaveLength(0);
+    expect(
+      renderPlayer({ layout: 'split', split_divider: true }).container.querySelectorAll('div[aria-hidden="true"]')
+    ).toHaveLength(1);
+  });
+
+  it('crops a frame that is not portrait, like the render', () => {
+    const { container } = renderPlayer({ layout: 'split' }, true, 1);
 
     expect(container.querySelectorAll('canvas')).toHaveLength(0);
   });

@@ -207,6 +207,9 @@ class Thumbnailer:
                 framing_timestamp=float(highlight.start),
                 layout=project.settings.layout,
                 stack_darkness=project.settings.stack_darkness,
+                split_position=project.settings.split_position,
+                split_swap=project.settings.split_swap,
+                split_divider=project.settings.split_divider,
             )
         finally:
             # The script has done its one job. Kept even on failure would mean a

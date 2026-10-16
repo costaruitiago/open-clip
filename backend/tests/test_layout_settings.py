@@ -27,6 +27,23 @@ def test_darkness_is_clamped_and_junk_falls_back():
     assert ProjectSettings.from_dict({"stack_darkness": True}).stack_darkness == 50
 
 
+def test_split_settings_round_trip():
+    stored = ProjectSettings.from_dict({"layout": "split", "split_position": 40,
+                                        "split_swap": True, "split_divider": True}).to_dict()
+    settings = ProjectSettings.from_dict(stored)
+    assert (settings.layout, settings.split_position, settings.split_swap, settings.split_divider) == (
+        "split", 40, True, True)
+
+
+def test_split_defaults_and_junk():
+    settings = ProjectSettings.from_dict({})
+    assert (settings.split_position, settings.split_swap, settings.split_divider) == (50, False, False)
+    assert ProjectSettings.from_dict({"split_position": 5}).split_position == 20
+    assert ProjectSettings.from_dict({"split_position": 95}).split_position == 80
+    assert ProjectSettings.from_dict({"split_position": "left"}).split_position == 50
+    assert ProjectSettings.from_dict({"split_swap": "yes"}).split_swap is False
+
+
 def test_a_highlight_records_its_layout():
     highlight = Highlight.from_json({"start": 0, "end": 1, "rendered_layout": "stacked"})
     assert Highlight.from_json(highlight.to_dict()).rendered_layout == "stacked"

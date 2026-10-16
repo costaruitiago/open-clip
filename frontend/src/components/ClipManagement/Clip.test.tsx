@@ -590,6 +590,15 @@ describe('Clip Component', () => {
       expect(dialog.querySelector('video')?.getAttribute('src')).toBe(SOURCE_URL);
     });
 
+    // A layout or ratio change leaves the burned file stale, and the card falls
+    // back to the source, which has no captions in it to stand in for the overlay.
+    it('draws the captions over the source preview of a stale cut that had them burned', async () => {
+      renderClip({ ...renderedClip, captionsBurned: true, outputStale: true }, 9 / 16, 'video');
+
+      expect(document.querySelector('video')?.getAttribute('src')).toBe(SOURCE_URL);
+      await waitFor(() => expect(screen.getByText('lost')).toBeDefined());
+    });
+
     it('says so when there is no video to place them against', async () => {
       render(
         <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>

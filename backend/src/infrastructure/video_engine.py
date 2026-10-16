@@ -70,6 +70,7 @@ def build_picture_args(
     src_w: int, src_h: int, target_w: int, target_h: int,
     subject_x: float = 0.5, subject_y: float = 0.5,
     layout: str = "crop", stack_darkness: int = 50,
+    split_position: int = 50, split_swap: bool = False, split_divider: bool = False,
     subtitle_path: Optional[str] = None,
 ) -> List[str]:
     """Returns the ffmpeg arguments that select and shape the video stream.
@@ -80,9 +81,37 @@ def build_picture_args(
     turns a widescreen shot into a vertical short. A target no taller than the
     scaled source leaves no band to fill, so it falls back to cropping.
 
+    "split" cuts the source at `split_position` percent of its width and puts
+    the left part on top and the right part below (the other way round with
+    `split_swap`), each cover-cropped around its own centre to fill its half
+    of the frame. It only applies to a portrait target; anything else crops.
+
     Subtitles are burned last either way, at output scale.
     """
     subtitles = f"subtitles='{escape_filter_path(str(subtitle_path))}'" if subtitle_path else None
+
+    if layout == "split" and target_h > target_w:
+        # The top takes the even half, the bottom whatever is left, so an odd
+        # half of an even height still adds back up to the target.
+        top_h = _make_even(target_h // 2)
+        cut = _make_even(round(src_w * max(1, min(int(split_position), 99)) / 100))
+        parts = [(0, cut), (cut, src_w - cut)]
+        if split_swap:
+            parts.reverse()
+        chains = []
+        for name, (part_x, part_w), slot_h in zip(("top", "bottom"), parts, (top_h, target_h - top_h)):
+            crop_w, crop_h, crop_x, crop_y = calculate_crop_rect(part_w, src_h, target_w, slot_h)
+            chains.append(
+                f"[{name}_in]crop={crop_w}:{crop_h}:{part_x + crop_x}:{crop_y},"
+                f"scale={target_w}:{slot_h},setsar=1[{name}]"
+            )
+        graph = "[0:v:0]split=2[top_in][bottom_in];" + ";".join(chains) + ";[top][bottom]vstack=inputs=2"
+        if split_divider:
+            thickness = max(2, _make_even(target_h // 240))
+            graph += f",drawbox=x=0:y={top_h - thickness // 2}:w=iw:h={thickness}:color=white:t=fill"
+        if subtitles:
+            graph += f",{subtitles}"
+        return ['-filter_complex', graph + "[v]", '-map', '[v]']
 
     mid_h = _make_even(round(target_w * src_h / src_w))
     band_h = _make_even((target_h - mid_h) // 2)
@@ -167,6 +196,7 @@ class VideoEngine(ABC):
         self, input_path: str, output_path: str, start: float, end: float,
         aspect_ratio: str, resolution: str, subtitle_path: Optional[str] = None,
         layout: str = "crop", stack_darkness: int = 50,
+        split_position: int = 50, split_swap: bool = False, split_divider: bool = False,
     ) -> None:
         pass
 
@@ -176,6 +206,7 @@ class VideoEngine(ABC):
         aspect_ratio: str, resolution: str, subtitle_path: Optional[str] = None,
         framing_timestamp: Optional[float] = None,
         layout: str = "crop", stack_darkness: int = 50,
+        split_position: int = 50, split_swap: bool = False, split_divider: bool = False,
     ) -> None:
         pass
 
@@ -236,6 +267,7 @@ class OpenCVVideoEngine(VideoEngine):
         self, input_path: str, output_path: str, start: float, end: float,
         aspect_ratio: str, resolution: str, subtitle_path: Optional[str] = None,
         layout: str = "crop", stack_darkness: int = 50,
+        split_position: int = 50, split_swap: bool = False, split_divider: bool = False,
     ) -> None:
         src_w, src_h, fps = probe_video(input_path)
         target_w, target_h = self._resolve_target_dimensions(src_w, src_h, aspect_ratio, resolution)
@@ -247,7 +279,8 @@ class OpenCVVideoEngine(VideoEngine):
         # than being cropped or resampled along with the picture.
         picture = build_picture_args(
             src_w, src_h, target_w, target_h, subj_x, subj_y,
-            layout=layout, stack_darkness=stack_darkness, subtitle_path=subtitle_path,
+            layout=layout, stack_darkness=stack_darkness, split_position=split_position,
+            split_swap=split_swap, split_divider=split_divider, subtitle_path=subtitle_path,
         )
 
         codec = settings_manager.get("codec") or "libx264"
@@ -280,6 +313,7 @@ class OpenCVVideoEngine(VideoEngine):
         aspect_ratio: str, resolution: str, subtitle_path: Optional[str] = None,
         framing_timestamp: Optional[float] = None,
         layout: str = "crop", stack_darkness: int = 50,
+        split_position: int = 50, split_swap: bool = False, split_divider: bool = False,
     ) -> None:
         """Writes one frame of the source as an image, framed like the clip.
 
@@ -304,7 +338,8 @@ class OpenCVVideoEngine(VideoEngine):
         subj_x, subj_y = self.get_subject_center(input_path, framing) or (0.5, 0.5)
         picture = build_picture_args(
             src_w, src_h, target_w, target_h, subj_x, subj_y,
-            layout=layout, stack_darkness=stack_darkness, subtitle_path=subtitle_path,
+            layout=layout, stack_darkness=stack_darkness, split_position=split_position,
+            split_swap=split_swap, split_divider=split_divider, subtitle_path=subtitle_path,
         )
 
         logger.info(f"Extracting frame at {timestamp}s from {input_path} to {output_path}")

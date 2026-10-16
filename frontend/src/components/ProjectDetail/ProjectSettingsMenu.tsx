@@ -23,7 +23,12 @@ type ProjectSettings = {
   clip_preview?: ClipPreview;
   layout?: Layout;
   stack_darkness?: number;
+  split_position?: number;
+  split_swap?: boolean;
+  split_divider?: boolean;
 };
+
+const LAYOUTS: Layout[] = ['crop', 'stacked', 'split'];
 
 /**
  * One in-flight save. The label is carried along so a failure can name the
@@ -59,6 +64,7 @@ export const ProjectSettingsMenu: React.FC<ProjectSettingsMenuProps> = ({ metada
   const clipPreviewId = useId();
   const layoutId = useId();
   const darknessId = useId();
+  const splitPositionId = useId();
   const errorId = useId();
 
   const { data: resolutionsData } = useQuery({ queryKey: ['resolutions'], queryFn: getResolutionMap });
@@ -120,10 +126,13 @@ export const ProjectSettingsMenu: React.FC<ProjectSettingsMenuProps> = ({ metada
   const currentAspectRatio = pendingSettings.aspect_ratio || storedSettings?.aspect_ratio || 'keep original';
   const currentClipPreview: ClipPreview =
     (pendingSettings.clip_preview ?? storedSettings?.clip_preview) === 'video' ? 'video' : 'thumbnail';
-  const currentLayout: Layout =
-    (pendingSettings.layout ?? storedSettings?.layout) === 'stacked' ? 'stacked' : 'crop';
+  const pickedLayout = pendingSettings.layout ?? storedSettings?.layout;
+  const currentLayout: Layout = pickedLayout && LAYOUTS.includes(pickedLayout) ? pickedLayout : 'crop';
   // `??` rather than `||`: 0 is a darkness, the one that leaves the bands alone.
   const currentDarkness = pendingSettings.stack_darkness ?? storedSettings?.stack_darkness ?? 50;
+  const currentSplitPosition = pendingSettings.split_position ?? storedSettings?.split_position ?? 50;
+  const currentSplitSwap = pendingSettings.split_swap ?? storedSettings?.split_swap ?? false;
+  const currentSplitDivider = pendingSettings.split_divider ?? storedSettings?.split_divider ?? false;
 
   return (
     // `aria-busy` rather than `disabled` on the controls. Disabling the select
@@ -181,8 +190,46 @@ export const ProjectSettingsMenu: React.FC<ProjectSettingsMenuProps> = ({ metada
             >
               <option value="crop">Crop to subject</option>
               <option value="stacked">Stacked (full frame)</option>
+              <option value="split">Split (left / right on top of each other)</option>
             </select>
           </span>
+
+          {currentLayout === 'split' && (
+            <>
+              <span className="options-bar__setting">
+                <label htmlFor={splitPositionId}>Split at: {currentSplitPosition}% from left</label>
+                <input
+                  id={splitPositionId}
+                  type="range"
+                  min={20}
+                  max={80}
+                  step={5}
+                  value={currentSplitPosition}
+                  aria-describedby={failedSetting === 'split position' ? errorId : undefined}
+                  onChange={(e) => saveSetting('split position', { split_position: Number(e.target.value) })}
+                  style={{ accentColor: 'var(--accent)', cursor: 'pointer' }}
+                />
+              </span>
+              <label className="options-bar__setting">
+                <input
+                  type="checkbox"
+                  checked={currentSplitSwap}
+                  aria-describedby={failedSetting === 'split order' ? errorId : undefined}
+                  onChange={(e) => saveSetting('split order', { split_swap: e.target.checked })}
+                />
+                Right part on top
+              </label>
+              <label className="options-bar__setting">
+                <input
+                  type="checkbox"
+                  checked={currentSplitDivider}
+                  aria-describedby={failedSetting === 'divider' ? errorId : undefined}
+                  onChange={(e) => saveSetting('divider', { split_divider: e.target.checked })}
+                />
+                Divider line
+              </label>
+            </>
+          )}
 
           {currentLayout === 'stacked' && (
             <span className="options-bar__setting">

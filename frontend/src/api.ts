@@ -420,7 +420,7 @@ export type HighlightProjectSettings = {
 export type ClipPreview = 'thumbnail' | 'video';
 
 /** How a widescreen source fills a taller frame. */
-export type Layout = 'crop' | 'stacked';
+export type Layout = 'crop' | 'stacked' | 'split';
 
 /** One placeholder a description template may use, as described by the backend. */
 export type DescriptionField = { field: string; description: string };
@@ -483,11 +483,18 @@ export type ProjectMetadata = {
     clip_preview?: ClipPreview;
     /**
      * How a widescreen source fills a taller frame: cropped around the
-     * subject, or kept whole between darkened copies of itself.
+     * subject, kept whole between darkened copies of itself, or cut into a
+     * left and a right part stacked one above the other.
      */
     layout?: Layout;
     /** How dark the stacked bands are, 0 (untouched) to 100 (black). */
     stack_darkness?: number;
+    /** Where the split layout cuts the source, as a percentage of its width (20-80). */
+    split_position?: number;
+    /** Split layout: the right part on top instead of the left. */
+    split_swap?: boolean;
+    /** Split layout: a line along the seam. */
+    split_divider?: boolean;
     /** Where this project's clips are imported, when it differs from the app's. */
     postiz?: PostizProjectSettings;
     /** How this project's clips go up on YouTube, when it differs from the app's. */
@@ -1047,6 +1054,9 @@ export const updateProjectSettings = async (
     clip_preview?: ClipPreview;
     layout?: Layout;
     stack_darkness?: number;
+    split_position?: number;
+    split_swap?: boolean;
+    split_divider?: boolean;
     postiz?: Partial<PostizProjectSettings>;
     upload?: Partial<UploadProjectSettings>;
   }

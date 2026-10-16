@@ -17,6 +17,7 @@ from backend.src.dataclasses.data import (
     DescriptionSettings,
     HighlightSettings,
     OverlayText,
+    as_split_position,
     as_stack_darkness,
     PostizSettings,
     Project,
@@ -1179,6 +1180,13 @@ class SimpleHandler(BaseHTTPRequestHandler):
                 project.settings.stack_darkness = as_stack_darkness(
                     data['stack_darkness'], project.settings.stack_darkness
                 )
+            if 'split_position' in data:
+                project.settings.split_position = as_split_position(
+                    data['split_position'], project.settings.split_position
+                )
+            for key in ('split_swap', 'split_divider'):
+                if isinstance(data.get(key), bool):
+                    setattr(project.settings, key, data[key])
             if 'description' in data:
                 # Merged, not replaced: the project page saves one field at a
                 # time as the user leaves it.

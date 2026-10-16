@@ -335,6 +335,57 @@ def test_stacked_extract_frame_darkens_only_the_bands(engine, sample_video, tmp_
     assert middle > top * 2
 
 
+def split_graph(**kwargs):
+    args = build_picture_args(1920, 1080, 1080, 1920, layout="split", **kwargs)
+    assert args[2:] == ["-map", "[v]"]
+    return args[args.index("-filter_complex") + 1]
+
+
+def test_split_puts_the_left_half_on_top_and_the_right_below():
+    graph = split_graph()
+    # Each 960x1080 half is cover-cropped to the 1080x960 slot it fills: full
+    # width, 852 of its height, centred.
+    assert "[top_in]crop=960:852:0:114,scale=1080:960,setsar=1[top]" in graph
+    assert "[bottom_in]crop=960:852:960:114,scale=1080:960,setsar=1[bottom]" in graph
+    assert graph.endswith("[top][bottom]vstack=inputs=2[v]")
+
+
+def test_split_swap_puts_the_right_half_on_top():
+    assert "[top_in]crop=960:852:960:114," in split_graph(split_swap=True)
+
+
+def test_split_position_moves_the_cut():
+    graph = split_graph(split_position=30)
+    # The cut lands at 576; the narrower left part keeps less of its height.
+    assert "[top_in]crop=576:512:0:284," in graph
+    assert "[bottom_in]crop=1214:1080:640:0," in graph
+
+
+def test_split_divider_is_drawn_on_the_seam_only_when_asked():
+    assert "drawbox" not in split_graph()
+    assert "vstack=inputs=2,drawbox=x=0:y=956:w=iw:h=8:color=white:t=fill[v]" in split_graph(split_divider=True)
+
+
+def test_split_burns_subtitles_over_both_halves():
+    assert split_graph(subtitle_path="/tmp/c.ass").endswith("vstack=inputs=2,subtitles='/tmp/c.ass'[v]")
+
+
+def test_split_falls_back_to_crop_for_a_target_that_is_not_portrait():
+    args = build_picture_args(1920, 1080, 1080, 1080, layout="split")
+    assert "-filter_complex" not in args
+
+
+@requires_ffmpeg
+def test_split_process_clip_produces_requested_dimensions(engine, sample_video, tmp_path, monkeypatch):
+    monkeypatch.setattr(engine, "get_subject_center", lambda *a, **k: None, raising=False)
+    output = tmp_path / "clip.mp4"
+
+    engine.process_clip(sample_video, str(output), 0.5, 2.0, "9:16", "keep original",
+                        layout="split", split_position=40, split_divider=True)
+
+    assert probe_video(str(output))[:2] == (606, 1080)
+
+
 def test_resolve_output_dimensions_matches_what_process_clip_renders(engine, monkeypatch):
     monkeypatch.setattr(
         "backend.src.infrastructure.video_engine.probe_video",

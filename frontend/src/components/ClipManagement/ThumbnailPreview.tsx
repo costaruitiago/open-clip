@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { CaptionOverlay } from './CaptionOverlay';
-import { StackedBands, stackBandFraction, useStackLayout } from './StackedBands';
+import { SplitHalves, StackedBands, splitApplies, stackBandFraction, useStackLayout } from './StackedBands';
 import { TextOverlay } from './TextOverlay';
 import type { CaptionFont, CaptionPreview, OverlayText, ThumbnailSettings } from '../../api';
 
@@ -52,9 +52,11 @@ export const ThumbnailPreview: React.FC<ThumbnailPreviewProps> = ({
   onClick,
 }) => {
   const ref = useRef<HTMLVideoElement>(null);
-  // Cut from the source like the render's still, so stacked like it too.
+  // Cut from the source like the render's still, so stacked or split like it too.
   const [sourceRatio, setSourceRatio] = useState<number | null>(null);
-  const stack = useStackLayout();
+  const layout = useStackLayout();
+  const stack = layout?.kind === 'stacked' ? layout : null;
+  const split = layout?.kind === 'split' && splitApplies(aspectRatio) ? layout : null;
   const band = stack ? stackBandFraction(aspectRatio, sourceRatio) : 0;
 
   const seek = useCallback(() => {
@@ -123,6 +125,7 @@ export const ThumbnailPreview: React.FC<ThumbnailPreviewProps> = ({
         }
       />
       {band > 0 && stack && <StackedBands video={ref} band={band} darkness={stack.darkness} />}
+      {split && <SplitHalves video={ref} position={split.position} swap={split.swap} divider={split.divider} />}
       {/* Off by default, and drawn from the cues rather than from pixels: a
           thumbnail that says no subtitles has none, whatever the clip file
           happens to carry. */}

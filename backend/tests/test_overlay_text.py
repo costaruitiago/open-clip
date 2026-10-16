@@ -349,10 +349,12 @@ class FakeEngine:
         return 1080, 1920
 
     def process_clip(self, input_path, output_path, start, end, aspect_ratio, resolution,
-                     subtitle_path=None, layout="crop", stack_darkness=50):
+                     subtitle_path=None, layout="crop", stack_darkness=50,
+                     split_position=50, split_swap=False, split_divider=False):
         self.calls.append({"output": output_path, "start": start, "end": end,
                            "subtitle_path": subtitle_path, "layout": layout,
-                           "stack_darkness": stack_darkness})
+                           "stack_darkness": stack_darkness, "split_position": split_position,
+                           "split_swap": split_swap, "split_divider": split_divider})
         Path(output_path).write_bytes(b"")
 
 

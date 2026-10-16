@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { formatTimecode } from '../../utils/aspectRatio';
 import { useVttUrl } from '../../utils/vtt';
-import { StackedBands, stackBandFraction, useStackLayout } from './StackedBands';
+import { SplitHalves, StackedBands, splitApplies, stackBandFraction, useStackLayout } from './StackedBands';
 import type { CaptionCue } from '../../api';
 
 interface ClipPlayerProps {
@@ -99,9 +99,11 @@ export const ClipPlayer: React.FC<ClipPlayerProps> = ({
   const vttUrl = useVttUrl(cues);
   // The source's own shape, which decides how tall the stacked bands are.
   const [sourceRatio, setSourceRatio] = useState<number | null>(null);
-  const stack = useStackLayout();
-  // Only a preview is stacked here: a cut file already carries its bands.
-  const band = isPreview && stack ? stackBandFraction(aspectRatio, sourceRatio) : 0;
+  const layout = useStackLayout();
+  // Only a preview is stacked or split here: a cut file already carries its layout.
+  const stack = isPreview && layout?.kind === 'stacked' ? layout : null;
+  const split = isPreview && layout?.kind === 'split' && splitApplies(aspectRatio) ? layout : null;
+  const band = stack ? stackBandFraction(aspectRatio, sourceRatio) : 0;
 
   const windowEnd = end ?? sourceDuration;
   const duration = Math.max(0, windowEnd - start);
@@ -294,6 +296,9 @@ export const ClipPlayer: React.FC<ClipPlayerProps> = ({
           {vttUrl && <track kind="captions" srcLang="en" label="Captions" src={vttUrl} />}
         </video>
         {band > 0 && stack && <StackedBands video={ref} band={band} darkness={stack.darkness} />}
+        {/* Over the video rather than instead of it: the halves are painted
+            from it, and clicks pass through them to it. */}
+        {split && <SplitHalves video={ref} position={split.position} swap={split.swap} divider={split.divider} />}
         {/* Inside the frame, so the captions sit where the render puts them
             rather than where the video element happens to end. */}
         {renderOverlay?.(position, isPlaying)}
