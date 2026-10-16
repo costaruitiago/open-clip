@@ -280,8 +280,11 @@ class YoutubeAuthSession:
         # `offline` plus `consent` is what makes Google return a refresh token:
         # without it a re-authorising user gets an access token that dies in an
         # hour and cannot be renewed.
+        # No `include_granted_scopes`: it makes Google return every scope this
+        # account ever granted the client, and oauthlib then refuses the token
+        # exchange with "Scope has changed", so reconnecting never saves a token.
         url, self._state = self._flow.authorization_url(
-            access_type="offline", include_granted_scopes="true", prompt="consent"
+            access_type="offline", prompt="consent"
         )
         return url
 
