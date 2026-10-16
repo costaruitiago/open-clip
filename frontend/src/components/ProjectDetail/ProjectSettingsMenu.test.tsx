@@ -116,6 +116,36 @@ describe('ProjectSettingsMenu', () => {
     expect((screen.getByLabelText(/Resolution/i) as HTMLSelectElement).value).toBe('4k');
   });
 
+  // The darkness only means anything for the stacked layout, so a cropping
+  // project is not shown a slider that does nothing.
+  it('offers the band darkness only once the layout is stacked', async () => {
+    const { updateProjectSettings } = await import('../../api');
+    renderMenu();
+
+    const layout = screen.getByLabelText(/Layout/i) as HTMLSelectElement;
+    expect(layout.value).toBe('crop');
+    expect(screen.queryByLabelText(/Band darkness/i)).toBeNull();
+
+    fireEvent.change(layout, { target: { value: 'stacked' } });
+
+    await waitFor(() =>
+      expect(vi.mocked(updateProjectSettings)).toHaveBeenCalledWith('p1', { layout: 'stacked' })
+    );
+    const darkness = (await screen.findByLabelText(/Band darkness/i)) as HTMLInputElement;
+    expect(darkness.value).toBe('50');
+
+    fireEvent.change(darkness, { target: { value: '70' } });
+    await waitFor(() =>
+      expect(vi.mocked(updateProjectSettings)).toHaveBeenCalledWith('p1', { stack_darkness: 70 })
+    );
+  });
+
+  it('keeps a darkness of zero rather than reading it as unset', () => {
+    renderMenu(metadata({ settings: { resolution: '1080p', aspect_ratio: '9:16', layout: 'stacked', stack_darkness: 0 } }));
+
+    expect((screen.getByLabelText(/Band darkness/i) as HTMLInputElement).value).toBe('0');
+  });
+
   // Captions have to be settable before the clipper runs, otherwise the only
   // way to reach them is a clip already rendered without them. The form is set
   // once and rarely revisited, so the menu carries a button and the dialog

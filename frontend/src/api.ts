@@ -258,6 +258,9 @@ export type Highlight = {
    *  the shape the project now asks for. */
   rendered_aspect_ratio?: string | null;
   rendered_resolution?: string | null;
+  /** The layout the file was cut with, or absent for one cut before layouts
+   *  existed — which was always a crop. */
+  rendered_layout?: Layout | null;
   /** When the window was last moved, or absent for one nobody has trimmed. A
    *  trim re-cuts nothing, so a stamp later than `rendered_at` means the file
    *  on disk still holds the window before the edit. */
@@ -416,6 +419,9 @@ export type HighlightProjectSettings = {
  */
 export type ClipPreview = 'thumbnail' | 'video';
 
+/** How a widescreen source fills a taller frame. */
+export type Layout = 'crop' | 'stacked';
+
 /** One placeholder a description template may use, as described by the backend. */
 export type DescriptionField = { field: string; description: string };
 
@@ -475,6 +481,13 @@ export type ProjectMetadata = {
      * about how the project is reviewed rather than about one clip.
      */
     clip_preview?: ClipPreview;
+    /**
+     * How a widescreen source fills a taller frame: cropped around the
+     * subject, or kept whole between darkened copies of itself.
+     */
+    layout?: Layout;
+    /** How dark the stacked bands are, 0 (untouched) to 100 (black). */
+    stack_darkness?: number;
     /** Where this project's clips are imported, when it differs from the app's. */
     postiz?: PostizProjectSettings;
     /** How this project's clips go up on YouTube, when it differs from the app's. */
@@ -1023,6 +1036,8 @@ export const updateProjectSettings = async (
     description?: Partial<DescriptionSettings>;
     highlights?: Partial<HighlightProjectSettings>;
     clip_preview?: ClipPreview;
+    layout?: Layout;
+    stack_darkness?: number;
     postiz?: Partial<PostizProjectSettings>;
     upload?: Partial<UploadProjectSettings>;
   }

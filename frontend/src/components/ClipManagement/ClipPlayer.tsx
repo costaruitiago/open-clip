@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { formatTimecode } from '../../utils/aspectRatio';
 import { useVttUrl } from '../../utils/vtt';
+import { StackedBands, stackBandFraction, useStackLayout } from './StackedBands';
 import type { CaptionCue } from '../../api';
 
 interface ClipPlayerProps {
@@ -96,6 +97,11 @@ export const ClipPlayer: React.FC<ClipPlayerProps> = ({
   // Only needed when there is no `end`: the file's own length is the window.
   const [sourceDuration, setSourceDuration] = useState(0);
   const vttUrl = useVttUrl(cues);
+  // The source's own shape, which decides how tall the stacked bands are.
+  const [sourceRatio, setSourceRatio] = useState<number | null>(null);
+  const stack = useStackLayout();
+  // Only a preview is stacked here: a cut file already carries its bands.
+  const band = isPreview && stack ? stackBandFraction(aspectRatio, sourceRatio) : 0;
 
   const windowEnd = end ?? sourceDuration;
   const duration = Math.max(0, windowEnd - start);
@@ -228,6 +234,8 @@ export const ClipPlayer: React.FC<ClipPlayerProps> = ({
           aria-label={label}
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={() => {
+            const { videoWidth, videoHeight } = ref.current ?? {};
+            if (videoWidth && videoHeight) setSourceRatio(videoWidth / videoHeight);
             const length = ref.current?.duration;
             if (typeof length === 'number' && Number.isFinite(length)) {
               setSourceDuration(length);
@@ -252,17 +260,31 @@ export const ClipPlayer: React.FC<ClipPlayerProps> = ({
           onEnded={seekToWindowStart}
           onError={() => setFailed(true)}
           onClick={togglePlay}
-          style={{
-            width: '100%',
-            height: aspectRatio ? '100%' : 'auto',
-            // A preview fills the target frame the way the render's
-            // crop-then-scale does, rather than letterboxing into it. A cut
-            // file is shown whole: if it does not match the ratio now set on
-            // the project, that mismatch is the truth about the file.
-            objectFit: aspectRatio && isPreview ? 'cover' : 'contain',
-            display: 'block',
-            cursor: 'pointer',
-          }}
+          style={
+            band > 0
+              ? {
+                  // Stacked: the whole frame, between the bands drawn below.
+                  position: 'absolute',
+                  left: 0,
+                  top: `${band * 100}%`,
+                  width: '100%',
+                  height: `${(1 - 2 * band) * 100}%`,
+                  objectFit: 'contain',
+                  display: 'block',
+                  cursor: 'pointer',
+                }
+              : {
+                  width: '100%',
+                  height: aspectRatio ? '100%' : 'auto',
+                  // A preview fills the target frame the way the render's
+                  // crop-then-scale does, rather than letterboxing into it. A cut
+                  // file is shown whole: if it does not match the ratio now set on
+                  // the project, that mismatch is the truth about the file.
+                  objectFit: aspectRatio && isPreview ? 'cover' : 'contain',
+                  display: 'block',
+                  cursor: 'pointer',
+                }
+          }
         >
           {/* Not `default` — captions may already be in the frames, and where
               they are not the overlay is drawing them; either way switching
@@ -271,6 +293,7 @@ export const ClipPlayer: React.FC<ClipPlayerProps> = ({
               menu, which painted pixels cannot. */}
           {vttUrl && <track kind="captions" srcLang="en" label="Captions" src={vttUrl} />}
         </video>
+        {band > 0 && stack && <StackedBands video={ref} band={band} darkness={stack.darkness} />}
         {/* Inside the frame, so the captions sit where the render puts them
             rather than where the video element happens to end. */}
         {renderOverlay?.(position, isPlaying)}

@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { CaptionOverlay } from './CaptionOverlay';
+import { StackedBands, stackBandFraction, useStackLayout } from './StackedBands';
 import { TextOverlay } from './TextOverlay';
 import type { CaptionFont, CaptionPreview, OverlayText, ThumbnailSettings } from '../../api';
 
@@ -51,6 +52,10 @@ export const ThumbnailPreview: React.FC<ThumbnailPreviewProps> = ({
   onClick,
 }) => {
   const ref = useRef<HTMLVideoElement>(null);
+  // Cut from the source like the render's still, so stacked like it too.
+  const [sourceRatio, setSourceRatio] = useState<number | null>(null);
+  const stack = useStackLayout();
+  const band = stack ? stackBandFraction(aspectRatio, sourceRatio) : 0;
 
   const seek = useCallback(() => {
     const video = ref.current;
@@ -89,16 +94,35 @@ export const ThumbnailPreview: React.FC<ThumbnailPreviewProps> = ({
         muted
         playsInline
         preload="metadata"
-        // Filled rather than letterboxed: the render crops the source to the
-        // output frame, and this box is already that shape.
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: aspectRatio ? 'cover' : 'contain',
-          display: 'block',
-          pointerEvents: 'none',
+        onLoadedMetadata={() => {
+          const { videoWidth, videoHeight } = ref.current ?? {};
+          if (videoWidth && videoHeight) setSourceRatio(videoWidth / videoHeight);
         }}
+        // Filled rather than letterboxed: the render crops the source to the
+        // output frame, and this box is already that shape. Stacked, the whole
+        // frame sits between the bands instead.
+        style={
+          band > 0
+            ? {
+                position: 'absolute',
+                left: 0,
+                top: `${band * 100}%`,
+                width: '100%',
+                height: `${(1 - 2 * band) * 100}%`,
+                objectFit: 'contain',
+                display: 'block',
+                pointerEvents: 'none',
+              }
+            : {
+                width: '100%',
+                height: '100%',
+                objectFit: aspectRatio ? 'cover' : 'contain',
+                display: 'block',
+                pointerEvents: 'none',
+              }
+        }
       />
+      {band > 0 && stack && <StackedBands video={ref} band={band} darkness={stack.darkness} />}
       {/* Off by default, and drawn from the cues rather than from pixels: a
           thumbnail that says no subtitles has none, whatever the clip file
           happens to carry. */}

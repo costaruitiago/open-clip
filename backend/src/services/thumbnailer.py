@@ -205,6 +205,8 @@ class Thumbnailer:
                 # would show a different part of the frame than the video it
                 # belongs to.
                 framing_timestamp=float(highlight.start),
+                layout=project.settings.layout,
+                stack_darkness=project.settings.stack_darkness,
             )
         finally:
             # The script has done its one job. Kept even on failure would mean a

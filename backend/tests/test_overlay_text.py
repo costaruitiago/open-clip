@@ -349,9 +349,10 @@ class FakeEngine:
         return 1080, 1920
 
     def process_clip(self, input_path, output_path, start, end, aspect_ratio, resolution,
-                     subtitle_path=None):
+                     subtitle_path=None, layout="crop", stack_darkness=50):
         self.calls.append({"output": output_path, "start": start, "end": end,
-                           "subtitle_path": subtitle_path})
+                           "subtitle_path": subtitle_path, "layout": layout,
+                           "stack_darkness": stack_darkness})
         Path(output_path).write_bytes(b"")
 
 
@@ -425,6 +426,20 @@ class TestSingleClipRender:
         clipper.render_one(Project(PROJECT_ID), 0)
 
         assert Project(PROJECT_ID).highlights[0].rendered_aspect_ratio == "1:1"
+
+    def test_a_stacked_project_cuts_stacked_and_records_it(self, project_root, monkeypatch):
+        project = self._project_with_two_clips(project_root)
+        project.settings.layout = "stacked"
+        project.settings.stack_darkness = 70
+        project.set_property("settings", project.settings)
+        engine = FakeEngine()
+        monkeypatch.setattr("backend.src.services.clipper.OpenCVVideoEngine", lambda path: engine)
+
+        Clipper().render_one(Project(PROJECT_ID), 0)
+
+        assert engine.calls[0]["layout"] == "stacked"
+        assert engine.calls[0]["stack_darkness"] == 70
+        assert Project(PROJECT_ID).highlights[0].rendered_layout == "stacked"
 
     def test_a_clip_with_no_title_burns_none(self, project_root, monkeypatch):
         project = self._project_with_two_clips(project_root)

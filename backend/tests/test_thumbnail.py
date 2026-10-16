@@ -81,10 +81,11 @@ class FakeEngine:
         return 1080, 1920
 
     def extract_frame(self, input_path, output_path, timestamp, aspect_ratio, resolution,
-                      subtitle_path=None, framing_timestamp=None):
+                      subtitle_path=None, framing_timestamp=None, layout="crop", stack_darkness=50):
         self.frames.append({
             "output": output_path, "timestamp": timestamp,
             "subtitle_path": subtitle_path, "framing_timestamp": framing_timestamp,
+            "layout": layout, "stack_darkness": stack_darkness,
             # Read here rather than after the fact: the script is scratch for
             # this one call and is deleted as soon as it returns.
             "subtitles": Path(subtitle_path).read_text() if subtitle_path else None,
@@ -313,6 +314,19 @@ class TestGenerate:
 
         assert engine.frames[0]["framing_timestamp"] == 10.0
 
+    def test_a_stacked_project_gets_a_stacked_thumbnail(self, project_root):
+        write_project(project_root)
+        project = Project(PROJECT_ID)
+        project.settings.layout = "stacked"
+        project.settings.stack_darkness = 30
+        project.set_property("settings", project.settings)
+        engine = FakeEngine()
+
+        Thumbnailer().generate(Project(PROJECT_ID), 0, engine=engine)
+
+        assert engine.frames[0]["layout"] == "stacked"
+        assert engine.frames[0]["stack_darkness"] == 30
+
     def test_subtitles_stay_off_unless_they_are_asked_for(self, project_root):
         write_project(project_root, captions_enabled=True,
                       overlay={"enabled": True, "text": "Cold open"})
@@ -470,11 +484,12 @@ class FailingEngine(FakeEngine):
         self.refuse = set(refuse)
 
     def extract_frame(self, input_path, output_path, timestamp, aspect_ratio, resolution,
-                      subtitle_path=None, framing_timestamp=None):
+                      subtitle_path=None, framing_timestamp=None, **layout):
         if Path(output_path).name in self.refuse:
             raise RuntimeError("ffmpeg fell over")
         super().extract_frame(input_path, output_path, timestamp, aspect_ratio, resolution,
-                              subtitle_path=subtitle_path, framing_timestamp=framing_timestamp)
+                              subtitle_path=subtitle_path, framing_timestamp=framing_timestamp,
+                              **layout)
 
 
 class TestStep:

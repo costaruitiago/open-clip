@@ -86,6 +86,31 @@ describe('matchesOutputSettings', () => {
     ).toBe(true);
   });
 
+  it('rejects a file cut before the layout was changed', () => {
+    expect(
+      matchesOutputSettings(
+        { ...settings, layout: 'stacked' },
+        { rendered_aspect_ratio: '9:16', rendered_resolution: 'keep original' }
+      )
+    ).toBe(false);
+    expect(
+      matchesOutputSettings(settings, {
+        rendered_aspect_ratio: '9:16',
+        rendered_resolution: 'keep original',
+        rendered_layout: 'stacked',
+      })
+    ).toBe(false);
+  });
+
+  it('accepts a stacked file under a stacked project', () => {
+    expect(
+      matchesOutputSettings(
+        { ...settings, layout: 'stacked' },
+        { rendered_aspect_ratio: '9:16', rendered_resolution: 'keep original', rendered_layout: 'stacked' }
+      )
+    ).toBe(true);
+  });
+
   // Every clip cut before this was recorded, which must not all read as stale.
   it('takes a file that recorded nothing at its word', () => {
     expect(matchesOutputSettings(settings, {})).toBe(true);

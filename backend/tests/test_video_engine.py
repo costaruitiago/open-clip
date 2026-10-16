@@ -1,11 +1,13 @@
 import shutil
 import subprocess
 
+import cv2
 import pytest
 
 from backend.src.infrastructure.video_engine import (
     OpenCVVideoEngine,
     build_encoder_args,
+    build_picture_args,
     calculate_crop_rect,
     escape_filter_path,
     probe_video,
@@ -263,6 +265,74 @@ def test_subtitles_are_burned_after_crop_and_scale(engine, monkeypatch):
 
 def test_no_subtitle_path_leaves_the_filter_chain_alone(engine, monkeypatch):
     assert "subtitles" not in video_filters(captured_ffmpeg_command(engine, monkeypatch))
+
+
+def stacked_graph(**kwargs):
+    args = build_picture_args(1920, 1080, 1080, 1920, layout="stacked", **kwargs)
+    assert args[2:] == ["-map", "[v]"]
+    return args[args.index("-filter_complex") + 1]
+
+
+def test_stacked_keeps_the_whole_frame_in_the_middle():
+    graph = stacked_graph()
+    # 1920x1080 at 1080 wide is 607.5, rounded to an even 608; the two bands
+    # share what is left of 1920 equally.
+    assert "[full]scale=1080:608,setsar=1[mid]" in graph
+    assert "scale=1080:656," in graph
+    assert "[top][mid][bottom]vstack=inputs=3" in graph
+
+
+def test_stacked_bands_are_darkened_by_the_setting():
+    assert "color=black@0.7:t=fill" in stacked_graph(stack_darkness=70)
+
+
+def test_stacked_darkness_is_clamped():
+    assert "color=black@1.0:t=fill" in stacked_graph(stack_darkness=250)
+    assert "color=black@0.0:t=fill" in stacked_graph(stack_darkness=-5)
+
+
+def test_stacked_burns_subtitles_over_the_whole_stack():
+    assert stacked_graph(subtitle_path="/tmp/c.ass").endswith("vstack=inputs=3,subtitles='/tmp/c.ass'[v]")
+
+
+def test_stacked_falls_back_to_crop_when_there_is_no_band_to_fill():
+    """A landscape target is no taller than the scaled source."""
+    args = build_picture_args(1920, 1080, 1920, 1080, layout="stacked")
+    assert "-filter_complex" not in args
+    assert args[:2] == ["-map", "0:v:0"]
+
+
+def test_stacked_process_clip_maps_the_stack_and_the_audio(engine, monkeypatch):
+    cmd = captured_ffmpeg_command(engine, monkeypatch, layout="stacked")
+    assert "-vf" not in cmd
+    assert cmd[cmd.index("-filter_complex") + 2:cmd.index("-filter_complex") + 6] == [
+        "-map", "[v]", "-map", "0:a:0?",
+    ]
+
+
+@requires_ffmpeg
+def test_stacked_process_clip_produces_requested_dimensions(engine, sample_video, tmp_path, monkeypatch):
+    monkeypatch.setattr(engine, "get_subject_center", lambda *a, **k: None, raising=False)
+    output = tmp_path / "clip.mp4"
+
+    engine.process_clip(sample_video, str(output), 0.5, 2.0, "9:16", "keep original",
+                        layout="stacked", stack_darkness=60)
+
+    assert probe_video(str(output))[:2] == (606, 1080)
+
+
+@requires_ffmpeg
+def test_stacked_extract_frame_darkens_only_the_bands(engine, sample_video, tmp_path, monkeypatch):
+    monkeypatch.setattr(engine, "get_subject_center", lambda *a, **k: None, raising=False)
+    output = tmp_path / "still.png"
+
+    engine.extract_frame(sample_video, str(output), 1.0, "9:16", "keep original",
+                         layout="stacked", stack_darkness=80)
+
+    frame = cv2.imread(str(output), cv2.IMREAD_GRAYSCALE)
+    height = frame.shape[0]
+    top, middle = frame[: height // 5].mean(), frame[2 * height // 5: 3 * height // 5].mean()
+    assert middle > top * 2
 
 
 def test_resolve_output_dimensions_matches_what_process_clip_renders(engine, monkeypatch):

@@ -25,6 +25,7 @@ import { OverlayStyler } from './OverlayStyler';
 import { ThumbnailEditor } from './ThumbnailEditor';
 import { ClipTrimmer } from './ClipTrimmer';
 import { ThumbnailPreview } from './ThumbnailPreview';
+import { StackLayoutContext, stackLayoutFor } from './StackedBands';
 import type { CaptionPreviewSource } from './ClipCaptionSettings';
 import { Button } from '../Button';
 import { matchesOutputSettings, targetAspectRatio } from '../../utils/aspectRatio';
@@ -342,7 +343,10 @@ export const ClipDetail: React.FC = () => {
   ];
 
   return (
-    // Full width, not content width: <main> is a column flex container with
+    // The project's layout, for every player and still below that previews
+    // from the source — dialogs included, which React reaches through portals.
+    <StackLayoutContext.Provider value={stackLayoutFor(projectMetadata.settings)}>
+    {/* Full width, not content width: <main> is a column flex container with
     // `align-items: flex-start`, which cancels the default stretch, so without
     // this the page was as wide as whatever the model happened to write.
     //
@@ -350,7 +354,7 @@ export const ClipDetail: React.FC = () => {
     // `.brutalist-card` put six bordered blocks inside a bordered block, which
     // is the one composition DESIGN.md rules out — and with 4px borders and no
     // radius it left every region weighted the same. The picture is now the
-    // only framed object on the page; everything else is text under a rule.
+    // only framed object on the page; everything else is text under a rule. */}
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
       <div className="split-grid">
         {/* min-width on both columns: a grid item's floor is its content, so
@@ -617,5 +621,6 @@ export const ClipDetail: React.FC = () => {
         </section>
       </div>
     </div>
+    </StackLayoutContext.Provider>
   );
 };

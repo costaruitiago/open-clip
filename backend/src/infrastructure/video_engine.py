@@ -66,6 +66,65 @@ def calculate_crop_rect(
     return crop_w, crop_h, crop_x, crop_y
 
 
+def build_picture_args(
+    src_w: int, src_h: int, target_w: int, target_h: int,
+    subject_x: float = 0.5, subject_y: float = 0.5,
+    layout: str = "crop", stack_darkness: int = 50,
+    subtitle_path: Optional[str] = None,
+) -> List[str]:
+    """Returns the ffmpeg arguments that select and shape the video stream.
+
+    "crop" cuts one window of the source around the subject. "stacked" keeps
+    the whole source frame in the middle at full brightness, with darkened
+    copies of it filling the bands above and below — the way broadcast news
+    turns a widescreen shot into a vertical short. A target no taller than the
+    scaled source leaves no band to fill, so it falls back to cropping.
+
+    Subtitles are burned last either way, at output scale.
+    """
+    subtitles = f"subtitles='{escape_filter_path(str(subtitle_path))}'" if subtitle_path else None
+
+    mid_h = _make_even(round(target_w * src_h / src_w))
+    band_h = _make_even((target_h - mid_h) // 2)
+    if layout == "stacked" and band_h > 0:
+        # The middle absorbs the even-rounding, so both bands are the same and
+        # one band can be rendered once and split.
+        mid_h = target_h - 2 * band_h
+        band_w, band_crop_h, band_x, band_y = calculate_crop_rect(
+            src_w, src_h, target_w, band_h, subject_x, subject_y
+        )
+        opacity = max(0, min(int(stack_darkness), 100)) / 100
+        graph = (
+            "[0:v:0]split=2[full][band];"
+            f"[full]scale={target_w}:{mid_h},setsar=1[mid];"
+            f"[band]crop={band_w}:{band_crop_h}:{band_x}:{band_y},"
+            f"scale={target_w}:{band_h},setsar=1,"
+            f"drawbox=x=0:y=0:w=iw:h=ih:color=black@{opacity}:t=fill,"
+            "split=2[top][bottom];"
+            "[top][mid][bottom]vstack=inputs=3"
+        )
+        if subtitles:
+            graph += f",{subtitles}"
+        return ['-filter_complex', graph + "[v]", '-map', '[v]']
+
+    crop_w, crop_h, crop_x, crop_y = calculate_crop_rect(
+        src_w, src_h, target_w, target_h, subject_x, subject_y
+    )
+    # Crop first, then scale, so the scaler only processes surviving pixels.
+    filters = []
+    if (crop_w, crop_h) != (src_w, src_h):
+        filters.append(f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y}")
+    if (crop_w, crop_h) != (target_w, target_h):
+        filters.append(f"scale={target_w}:{target_h}")
+    if subtitles:
+        filters.append(subtitles)
+
+    args = ['-map', '0:v:0']
+    if filters:
+        args += ['-vf', ','.join(filters)]
+    return args
+
+
 def build_encoder_args(codec: str, target_w: int, target_h: int, fps: float) -> List[str]:
     """Returns codec-appropriate quality flags.
 
@@ -107,6 +166,7 @@ class VideoEngine(ABC):
     def process_clip(
         self, input_path: str, output_path: str, start: float, end: float,
         aspect_ratio: str, resolution: str, subtitle_path: Optional[str] = None,
+        layout: str = "crop", stack_darkness: int = 50,
     ) -> None:
         pass
 
@@ -115,6 +175,7 @@ class VideoEngine(ABC):
         self, input_path: str, output_path: str, timestamp: float,
         aspect_ratio: str, resolution: str, subtitle_path: Optional[str] = None,
         framing_timestamp: Optional[float] = None,
+        layout: str = "crop", stack_darkness: int = 50,
     ) -> None:
         pass
 
@@ -174,6 +235,7 @@ class OpenCVVideoEngine(VideoEngine):
     def process_clip(
         self, input_path: str, output_path: str, start: float, end: float,
         aspect_ratio: str, resolution: str, subtitle_path: Optional[str] = None,
+        layout: str = "crop", stack_darkness: int = 50,
     ) -> None:
         src_w, src_h, fps = probe_video(input_path)
         target_w, target_h = self._resolve_target_dimensions(src_w, src_h, aspect_ratio, resolution)
@@ -181,34 +243,24 @@ class OpenCVVideoEngine(VideoEngine):
         # Smart Center
         subj_x, subj_y = self.get_subject_center(input_path, start) or (0.5, 0.5)
 
-        crop_w, crop_h, crop_x, crop_y = calculate_crop_rect(
-            src_w, src_h, target_w, target_h, subj_x, subj_y
+        # Captions are burned last, so they are drawn at output scale rather
+        # than being cropped or resampled along with the picture.
+        picture = build_picture_args(
+            src_w, src_h, target_w, target_h, subj_x, subj_y,
+            layout=layout, stack_darkness=stack_darkness, subtitle_path=subtitle_path,
         )
 
-        # Crop first, then scale, so the scaler only processes surviving pixels.
-        filters = []
-        if (crop_w, crop_h) != (src_w, src_h):
-            filters.append(f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y}")
-        if (crop_w, crop_h) != (target_w, target_h):
-            filters.append(f"scale={target_w}:{target_h}")
-
-        # Burned last, so the captions are drawn at output scale rather than
-        # being cropped or resampled along with the picture.
-        if subtitle_path:
-            filters.append(f"subtitles='{escape_filter_path(str(subtitle_path))}'")
-
         codec = settings_manager.get("codec") or "libx264"
-        logger.info(f"Encoding clip with codec: {codec}, target={target_w}x{target_h}, crop={crop_w}x{crop_h}+{crop_x}+{crop_y}")
+        logger.info(f"Encoding clip with codec: {codec}, target={target_w}x{target_h}, layout={layout}")
 
         cmd = [
             'ffmpeg', '-y', '-nostdin', '-loglevel', 'error',
             '-ss', str(start),
             '-to', str(end),
             '-i', input_path,
-            '-map', '0:v:0', '-map', '0:a:0?',
+            *picture,
+            '-map', '0:a:0?',
         ]
-        if filters:
-            cmd += ['-vf', ','.join(filters)]
         cmd += ['-c:v', codec]
         cmd += build_encoder_args(codec, target_w, target_h, fps)
         cmd += [
@@ -227,6 +279,7 @@ class OpenCVVideoEngine(VideoEngine):
         self, input_path: str, output_path: str, timestamp: float,
         aspect_ratio: str, resolution: str, subtitle_path: Optional[str] = None,
         framing_timestamp: Optional[float] = None,
+        layout: str = "crop", stack_darkness: int = 50,
     ) -> None:
         """Writes one frame of the source as an image, framed like the clip.
 
@@ -249,17 +302,10 @@ class OpenCVVideoEngine(VideoEngine):
 
         framing = timestamp if framing_timestamp is None else framing_timestamp
         subj_x, subj_y = self.get_subject_center(input_path, framing) or (0.5, 0.5)
-        crop_w, crop_h, crop_x, crop_y = calculate_crop_rect(
-            src_w, src_h, target_w, target_h, subj_x, subj_y
+        picture = build_picture_args(
+            src_w, src_h, target_w, target_h, subj_x, subj_y,
+            layout=layout, stack_darkness=stack_darkness, subtitle_path=subtitle_path,
         )
-
-        filters = []
-        if (crop_w, crop_h) != (src_w, src_h):
-            filters.append(f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y}")
-        if (crop_w, crop_h) != (target_w, target_h):
-            filters.append(f"scale={target_w}:{target_h}")
-        if subtitle_path:
-            filters.append(f"subtitles='{escape_filter_path(str(subtitle_path))}'")
 
         logger.info(f"Extracting frame at {timestamp}s from {input_path} to {output_path}")
 
@@ -267,11 +313,9 @@ class OpenCVVideoEngine(VideoEngine):
             'ffmpeg', '-y', '-nostdin', '-loglevel', 'error',
             '-ss', str(max(0.0, timestamp)),
             '-i', input_path,
-            '-map', '0:v:0',
+            *picture,
             '-frames:v', '1',
         ]
-        if filters:
-            cmd += ['-vf', ','.join(filters)]
         # 2 is the best JPEG quality ffmpeg will give without going lossless.
         # YouTube caps a thumbnail at 2MB, which a 1080x1920 frame stays well
         # under at this setting.

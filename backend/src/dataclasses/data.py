@@ -417,6 +417,9 @@ class Highlight:
     # as "matches" rather than as stale.
     rendered_aspect_ratio: Optional[str] = None
     rendered_resolution: Optional[str] = None
+    # The layout the file was cut with, for the same reason. None is a file cut
+    # before layouts existed, which was always a crop.
+    rendered_layout: Optional[str] = None
     # When somebody last moved this clip's start or end, or None for a window
     # nobody has touched. Kept because a trim does not re-cut anything: the file
     # on disk still holds the old window, and a card showing the new timecodes
@@ -508,6 +511,7 @@ class Highlight:
             # declaring every already-rendered clip in every project stale.
             rendered_aspect_ratio=data.get("rendered_aspect_ratio"),
             rendered_resolution=data.get("rendered_resolution"),
+            rendered_layout=data.get("rendered_layout"),
             # Absent for every clip whose window is still the one the model
             # picked, which is every clip written before trimming existed.
             trimmed_at=data.get("trimmed_at"),
@@ -894,6 +898,19 @@ class UploadSettings:
 # the choice is about how the project is reviewed rather than about one clip.
 CLIP_PREVIEW_CHOICES = ("thumbnail", "video")
 
+# How a widescreen source fills a taller frame: one window cropped around the
+# subject, or the whole frame in the middle with darkened copies of it stacked
+# above and below.
+LAYOUT_CHOICES = ("crop", "stacked")
+DEFAULT_STACK_DARKNESS = 50
+
+
+def as_stack_darkness(value: Any, fallback: int = DEFAULT_STACK_DARKNESS) -> int:
+    """A darkness percentage clamped to 0-100, or `fallback` for anything else."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return fallback
+    return max(0, min(int(value), 100))
+
 
 @dataclass
 class ProjectSettings:
@@ -927,6 +944,13 @@ class ProjectSettings:
     # in a feed, which is the question being asked while reviewing them. The
     # video frame is one click away either way.
     clip_preview: str = "thumbnail"
+    # Crop by default, which is what every project rendered before stacking
+    # existed. Stacking only changes a render whose frame is taller than the
+    # source; anything else is cropped whatever this says.
+    layout: str = "crop"
+    # How dark the stacked bands are drawn, as a percentage: 0 leaves them at
+    # full brightness, 100 is black.
+    stack_darkness: int = DEFAULT_STACK_DARKNESS
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -955,6 +979,8 @@ class ProjectSettings:
             # the default rather than reaching the page as a state it cannot
             # draw.
             clip_preview=preview if preview in CLIP_PREVIEW_CHOICES else "thumbnail",
+            layout=data.get("layout") if data.get("layout") in LAYOUT_CHOICES else "crop",
+            stack_darkness=as_stack_darkness(data.get("stack_darkness")),
         )
 
 @dataclass

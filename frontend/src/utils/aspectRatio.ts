@@ -1,6 +1,7 @@
 export type VideoOutputSettings = {
   resolution?: string;
   aspect_ratio?: string;
+  layout?: string;
 };
 
 /**
@@ -37,6 +38,7 @@ export const targetAspectRatio = (
 export type RenderedOutput = {
   rendered_aspect_ratio?: string | null;
   rendered_resolution?: string | null;
+  rendered_layout?: string | null;
 };
 
 /** "keep original" and an unset setting are the same instruction. */
@@ -62,7 +64,10 @@ export const matchesOutputSettings = (
   if (!rendered?.rendered_aspect_ratio && !rendered?.rendered_resolution) return true;
   return (
     outputChoice(rendered.rendered_aspect_ratio) === outputChoice(settings?.aspect_ratio) &&
-    outputChoice(rendered.rendered_resolution) === outputChoice(settings?.resolution)
+    outputChoice(rendered.rendered_resolution) === outputChoice(settings?.resolution) &&
+    // Unset on either side is a crop: files cut before layouts existed, and
+    // projects that never chose one.
+    (rendered.rendered_layout || 'crop') === (settings?.layout || 'crop')
   );
 };
 

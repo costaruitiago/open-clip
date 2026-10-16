@@ -115,6 +115,8 @@ class Clipper:
             project.settings.aspect_ratio,
             project.settings.resolution,
             subtitle_path=subtitle_path,
+            layout=project.settings.layout,
+            stack_darkness=project.settings.stack_darkness,
         )
 
         highlight.is_clip_generated = True
@@ -133,6 +135,7 @@ class Clipper:
         # the settings from one that only used to.
         highlight.rendered_aspect_ratio = project.settings.aspect_ratio
         highlight.rendered_resolution = project.settings.resolution
+        highlight.rendered_layout = project.settings.layout
         project.set_property("highlights", project.highlights)
         return filename
 

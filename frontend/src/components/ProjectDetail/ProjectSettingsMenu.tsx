@@ -12,11 +12,18 @@ import {
   getResolutionMap,
   updateProjectSettings,
   type ClipPreview,
+  type Layout,
   type ProjectMetadata,
 } from '../../api';
 
-/** The three project settings edited in place, in the menu. */
-type ProjectSettings = { resolution?: string; aspect_ratio?: string; clip_preview?: ClipPreview };
+/** The project settings edited in place, in the menu. */
+type ProjectSettings = {
+  resolution?: string;
+  aspect_ratio?: string;
+  clip_preview?: ClipPreview;
+  layout?: Layout;
+  stack_darkness?: number;
+};
 
 /**
  * One in-flight save. The label is carried along so a failure can name the
@@ -50,6 +57,8 @@ export const ProjectSettingsMenu: React.FC<ProjectSettingsMenuProps> = ({ metada
   const resolutionId = useId();
   const aspectRatioId = useId();
   const clipPreviewId = useId();
+  const layoutId = useId();
+  const darknessId = useId();
   const errorId = useId();
 
   const { data: resolutionsData } = useQuery({ queryKey: ['resolutions'], queryFn: getResolutionMap });
@@ -111,6 +120,10 @@ export const ProjectSettingsMenu: React.FC<ProjectSettingsMenuProps> = ({ metada
   const currentAspectRatio = pendingSettings.aspect_ratio || storedSettings?.aspect_ratio || 'keep original';
   const currentClipPreview: ClipPreview =
     (pendingSettings.clip_preview ?? storedSettings?.clip_preview) === 'video' ? 'video' : 'thumbnail';
+  const currentLayout: Layout =
+    (pendingSettings.layout ?? storedSettings?.layout) === 'stacked' ? 'stacked' : 'crop';
+  // `??` rather than `||`: 0 is a darkness, the one that leaves the bands alone.
+  const currentDarkness = pendingSettings.stack_darkness ?? storedSettings?.stack_darkness ?? 50;
 
   return (
     // `aria-busy` rather than `disabled` on the controls. Disabling the select
@@ -155,7 +168,40 @@ export const ProjectSettingsMenu: React.FC<ProjectSettingsMenuProps> = ({ metada
             </select>
           </span>
 
-          {/* Not a render setting like the two above — this one changes nothing
+          {/* Only changes a render whose frame is taller than the source — a
+              widescreen video cut to 9:16. Anything else is cropped either way. */}
+          <span className="options-bar__setting">
+            <label htmlFor={layoutId}>Layout:</label>
+            <select
+              id={layoutId}
+              className="options-bar__select"
+              value={currentLayout}
+              aria-describedby={failedSetting === 'layout' ? errorId : undefined}
+              onChange={(e) => saveSetting('layout', { layout: e.target.value as Layout })}
+            >
+              <option value="crop">Crop to subject</option>
+              <option value="stacked">Stacked (full frame)</option>
+            </select>
+          </span>
+
+          {currentLayout === 'stacked' && (
+            <span className="options-bar__setting">
+              <label htmlFor={darknessId}>Band darkness: {currentDarkness}%</label>
+              <input
+                id={darknessId}
+                type="range"
+                min={0}
+                max={100}
+                step={5}
+                value={currentDarkness}
+                aria-describedby={failedSetting === 'band darkness' ? errorId : undefined}
+                onChange={(e) => saveSetting('band darkness', { stack_darkness: Number(e.target.value) })}
+                style={{ accentColor: 'var(--accent)', cursor: 'pointer' }}
+              />
+            </span>
+          )}
+
+          {/* Not a render setting like the ones above — this one changes nothing
               about the files. It sits with them because it is the third thing
               that applies to every clip at once. */}
           <span className="options-bar__setting">

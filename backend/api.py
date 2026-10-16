@@ -12,10 +12,12 @@ from urllib.parse import urlparse, parse_qs
 
 from backend.src.dataclasses.data import (
     CLIP_PREVIEW_CHOICES,
+    LAYOUT_CHOICES,
     CaptionSettings,
     DescriptionSettings,
     HighlightSettings,
     OverlayText,
+    as_stack_darkness,
     PostizSettings,
     Project,
     ThumbnailSettings,
@@ -1168,6 +1170,12 @@ class SimpleHandler(BaseHTTPRequestHandler):
                     data['clip_preview']
                     if data['clip_preview'] in CLIP_PREVIEW_CHOICES
                     else project.settings.clip_preview
+                )
+            if 'layout' in data and data['layout'] in LAYOUT_CHOICES:
+                project.settings.layout = data['layout']
+            if 'stack_darkness' in data:
+                project.settings.stack_darkness = as_stack_darkness(
+                    data['stack_darkness'], project.settings.stack_darkness
                 )
             if 'description' in data:
                 # Merged, not replaced: the project page saves one field at a

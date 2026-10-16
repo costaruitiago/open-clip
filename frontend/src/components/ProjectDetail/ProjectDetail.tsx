@@ -16,6 +16,7 @@ import {
 } from '../../api';
 import { matchesOutputSettings, targetAspectRatio } from '../../utils/aspectRatio';
 import { stepLabel } from '../../utils/stepLabels';
+import { StackLayoutContext, stackLayoutFor } from '../ClipManagement/StackedBands';
 
 /**
  * How far into the clips a run has got.
@@ -284,15 +285,17 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ metadata, pipeline
         {/* Counts clips, so it reads above the clips rather than inside a
             pipeline menu in the header. */}
         {isActive && clipProgress && clipProgress.total > 0 && <ProgressLine progress={clipProgress} />}
-        <ClipManager
-          projectId={displayMetadata.project_id}
-          clips={clips}
-          sourceUrl={sourceUrl}
-          aspectRatio={previewAspectRatio}
-          clipPreview={currentClipPreview}
-          onDeleteClip={onDeleteClip}
-          isLoading={isClipperRunning}
-        />
+        <StackLayoutContext.Provider value={stackLayoutFor(displayMetadata.settings)}>
+          <ClipManager
+            projectId={displayMetadata.project_id}
+            clips={clips}
+            sourceUrl={sourceUrl}
+            aspectRatio={previewAspectRatio}
+            clipPreview={currentClipPreview}
+            onDeleteClip={onDeleteClip}
+            isLoading={isClipperRunning}
+          />
+        </StackLayoutContext.Provider>
       </section>
 
     </div>
