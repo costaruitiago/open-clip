@@ -11,7 +11,6 @@ from backend.src.services.transcriber import Transcriber
 from backend.src.services.llm_query import LLMQuery
 from backend.src.services.llm_tasks import discover_tasks
 from backend.src.services.clipper import Clipper
-from backend.src.services.thumbnailer import Thumbnailer
 from backend.src.services.postiz_publisher import PostizImportInProgressError, PostizPublisher
 from backend.src.services.uploader import Uploader, UploadInProgressError
 
@@ -32,17 +31,9 @@ class ClipRegenerationInProgressError(Exception):
     """A clip was asked to re-cut while its previous re-cut is still running."""
 
 
-class ThumbnailInProgressError(Exception):
-    """A thumbnail was asked for while the previous one is still rendering."""
-
-
 class PipelineOrchestrator:
-    def __init__(self, config_path: str = "backend/config/pipeline.json", active_processes: Dict[str, Any] = None, services: Dict[str, Any] = None, thumbnailer: Optional[Thumbnailer] = None):
+    def __init__(self, config_path: str = "backend/config/pipeline.json", active_processes: Dict[str, Any] = None, services: Dict[str, Any] = None):
         self.config_path = Path(config_path)
-        # Not a pipeline step and deliberately not in `services`: a thumbnail
-        # is made per clip, on request or alongside a cut, never as a stage of
-        # its own.
-        self.thumbnailer = thumbnailer or Thumbnailer()
         self.llm_tasks = discover_tasks()
         self.pipeline_config = self._load_pipeline_config()
         self.active_project_orchestrators: Dict[str, threading.Thread] = {}
@@ -75,14 +66,7 @@ class PipelineOrchestrator:
             # the clipper takes a callback and never learns what Postiz is, and
             # the publisher decides for itself whether it is configured to act.
             "clipper": Clipper(on_clip_rendered=postiz.import_rendered),
-            # The same object `generate_thumbnail` renders one still with. As a
-            # step it draws them all, which is the way to redraw a project after
-            # the overlay look changed.
-            "thumbnails": self.thumbnailer,
-            # The same thumbnailer the clip pages render stills with, so an
-            # upload's still is drawn by the one that has the caption service
-            # this orchestrator was given.
-            "upload": Uploader(thumbnailer=self.thumbnailer),
+            "upload": Uploader(),
             "postiz": postiz,
         }
         for name, task in self.llm_tasks.items():
@@ -588,31 +572,6 @@ class PipelineOrchestrator:
         thread = threading.Thread(target=runner)
         thread.start()
         return key
-
-    def generate_thumbnail(self, project_id: str, clip_index: int) -> Dict[str, Any]:
-        """Renders one clip's thumbnail and returns what it produced.
-
-        Synchronous, unlike a re-cut: this is one frame and the picture is what
-        the user is waiting to look at, so a job id would only make the page
-        poll for something that has already happened.
-
-        Registered as an active process all the same, so two clicks do not run
-        two ffmpeg passes over the same output file.
-
-        Raises IndexError when there is no highlight at `clip_index`, and
-        ThumbnailInProgressError while one is already being made.
-        """
-        key = f"{project_id}_thumbnail_{clip_index}"
-        with self._lock:
-            if key in self.active_processes:
-                raise ThumbnailInProgressError("This thumbnail is already being made.")
-            self.active_processes[key] = time.time()
-
-        try:
-            project = Project(project_id)
-            return self.thumbnailer.generate(project, clip_index).to_dict()
-        finally:
-            self._unregister_process(key)
 
     def run_pipeline(self, project_id: str):
         """Triggers the full pipeline in the background using dependency graph."""

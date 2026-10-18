@@ -31,7 +31,6 @@ JEV_TITLE_BATCH = 10
 # What Gemini writes for each Jev clip.
 JEV_TEXT_FIELDS = (
     "viral_hook_text",
-    "thumbnail_text",
     "video_title_for_youtube_short",
     "video_description_for_youtube_short",
     "video_description_for_x",

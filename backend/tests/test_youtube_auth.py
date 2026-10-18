@@ -73,8 +73,7 @@ def test_a_token_that_names_no_scopes_falls_back_to_the_ones_asked_for(tmp_path)
 
 def test_a_token_without_the_read_scope_is_connected_but_short_of_one(tmp_path):
     # Uploads work on this token. What it cannot do is be asked whether a video
-    # has finished processing, which is what decides when a thumbnail is safe
-    # to attach.
+    # has finished processing.
     path = write_token(tmp_path, [UPLOAD, FORCE_SSL])
 
     status = token_status(path)

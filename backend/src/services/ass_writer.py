@@ -114,18 +114,13 @@ def build_style_line(style: Dict[str, Any], width: int, height: int) -> str:
     )
 
 
-def build_overlay_style_line(overlay: OverlayText, width: int, height: int,
-                             name: str = OVERLAY_STYLE_NAME) -> str:
+def build_overlay_style_line(overlay: OverlayText, width: int, height: int) -> str:
     """The `[V4+ Styles]` line for the overlay title.
 
     The same em-to-Fontsize conversion and halved outline as a caption style —
     the overlay is previewed in CSS by the same rules — but anchored to the top
     of the frame (alignment 8), because a title hangs off the top edge rather
     than sitting above the bottom one.
-
-    `name` is a parameter because a thumbnail draws two of these at once — the
-    clip's title and a line written for the still alone — and two blocks of
-    text with different sizes and positions cannot share one style.
     """
     em = height * overlay.font_size_pct / 100
     face = resolve_face(overlay.font_family, overlay.bold, overlay.italic)
@@ -147,7 +142,7 @@ def build_overlay_style_line(overlay: OverlayText, width: int, height: int,
         outline_color = ass_color(overlay.outline_color, force_opaque=True)
 
     return (
-        f"Style: {name},{overlay.font_family},{font_size},"
+        f"Style: {OVERLAY_STYLE_NAME},{overlay.font_family},{font_size},"
         f"{ass_color(overlay.text_color, force_opaque=True)},"
         f"{ass_color(overlay.text_color, force_opaque=True)},"
         f"{outline_color},"
@@ -309,89 +304,4 @@ def render_ass(cues: Sequence[CaptionCue], style: Dict[str, Any], width: int, he
         event = build_overlay_event(overlay)
         if event:
             lines.append(event)
-    return "\n".join(lines) + "\n"
-
-
-# A still is one frame, so everything drawn on it is drawn from the first
-# moment of the script and stays. Ten seconds is simply longer than the one
-# frame ffmpeg will take out of it.
-STILL_DURATION = 10.0
-
-
-def _still_cue_event(cue: CaptionCue, style: Dict[str, Any], time: float) -> Optional[str]:
-    """The caption a viewer would see at `time`, frozen with no animation.
-
-    The word being spoken keeps the active colour it has in the video, because
-    that is what the frame at that instant actually looks like — but not the
-    scale-up, which is a 120ms movement and a still has no movement to show.
-    """
-    if not cue.words:
-        return None
-    active_color = ass_color(style["active_color"], force_opaque=True)
-    # The active word holds until the next one starts, the same rule the burned
-    # events and the browser overlay follow.
-    active = max(
-        (index for index, word in enumerate(cue.words) if time >= word.start),
-        default=0,
-    )
-    animated = style["animation"] in ("karaoke", "word")
-
-    rendered = []
-    for index, word in enumerate(cue.words):
-        body = _word_text(word.text, style)
-        if animated and index == active:
-            body = f"{{\\c{active_color}&}}{body}{{\\r}}"
-        rendered.append(body)
-    return _dialogue(0.0, STILL_DURATION, " ".join(rendered))
-
-
-def render_still_ass(cues: Sequence[CaptionCue], style: Dict[str, Any], width: int, height: int,
-                     overlays: Sequence[OverlayText], time: float) -> str:
-    """An ASS script describing one frozen frame, for burning onto a thumbnail.
-
-    Not a shortened `render_ass`: a thumbnail is extracted by seeking the source
-    and taking a single frame, which arrives at timestamp zero however far into
-    the clip it came from. So everything that should appear on it — the caption
-    that covers `time`, the clip's title, any text written for the still alone —
-    is emitted at zero, with the fades dropped. What the frame keeps is the
-    *look*: the same styles, the same font sizes as fractions of the same
-    frame, so the thumbnail and the video agree about where the words sit.
-
-    `overlays` are drawn in order, each on its own layer above the captions.
-    """
-    lines = [
-        "[Script Info]",
-        "ScriptType: v4.00+",
-        "WrapStyle: 1",
-        "ScaledBorderAndShadow: yes",
-        f"PlayResX: {width}",
-        f"PlayResY: {height}",
-        "",
-        "[V4+ Styles]",
-        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, "
-        "BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, "
-        "BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-        build_style_line(style, width, height),
-    ]
-    names = [f"{OVERLAY_STYLE_NAME}{position}" for position in range(len(overlays))]
-    for overlay, name in zip(overlays, names):
-        lines.append(build_overlay_style_line(overlay, width, height, name))
-    lines.extend([
-        "",
-        "[Events]",
-        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
-    ])
-
-    cue = next((candidate for candidate in cues if candidate.start <= time < candidate.end), None)
-    if cue is not None:
-        event = _still_cue_event(cue, style, time)
-        if event:
-            lines.append(event)
-
-    for layer, (overlay, name) in enumerate(zip(overlays, names), start=1):
-        lines.append(
-            f"Dialogue: {layer},{ass_timestamp(0.0)},{ass_timestamp(STILL_DURATION)},"
-            f"{name},,0,0,0,,{overlay_body(overlay)}"
-        )
-
     return "\n".join(lines) + "\n"

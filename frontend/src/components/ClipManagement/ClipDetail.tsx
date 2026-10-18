@@ -6,7 +6,6 @@ import {
   getClipCaptions,
   getClipDescription,
   getClipVideoUrl,
-  getClipThumbnail,
   getSourceVideoUrl,
   getAspectRatioMap,
   getResolutionMap,
@@ -22,11 +21,8 @@ import { CaptionStyler } from './CaptionStyler';
 import { TextOverlay } from './TextOverlay';
 import { OverlayTextEditor } from './OverlayTextEditor';
 import { OverlayStyler } from './OverlayStyler';
-import { ThumbnailEditor } from './ThumbnailEditor';
 import { ClipTrimmer } from './ClipTrimmer';
-import { ThumbnailPreview } from './ThumbnailPreview';
 import { StackLayoutContext, stackLayoutFor } from './StackedBands';
-import type { CaptionPreviewSource } from './ClipCaptionSettings';
 import { Button } from '../Button';
 import { matchesOutputSettings, targetAspectRatio } from '../../utils/aspectRatio';
 
@@ -146,7 +142,6 @@ export const ClipDetail: React.FC = () => {
   const { id: projectId, clipIndex } = useParams<{ id: string; clipIndex: string }>();
   const navigate = useNavigate();
   const [isEditingOverlay, setIsEditingOverlay] = useState(false);
-  const [isEditingThumbnail, setIsEditingThumbnail] = useState(false);
   const [isTrimming, setIsTrimming] = useState(false);
   // What the editor is typing, held here rather than in the dialog so the
   // player behind it redraws on every keystroke instead of waiting for the
@@ -206,15 +201,6 @@ export const ClipDetail: React.FC = () => {
 
   // The finished description, template and all, rendered by the backend. This
   // is the exact text an upload would carry, not an approximation of it.
-  // Which frame this clip's thumbnail is, and what is written on it. The page
-  // draws it rather than fetching a picture: none is made until the clip is
-  // published, and a frame with text over it is what this page already draws.
-  const { data: thumbnail } = useQuery({
-    queryKey: ['clipThumbnail', projectId, clipIndexNum],
-    queryFn: () => getClipThumbnail(projectId!, clipIndexNum),
-    enabled: !!projectId && clipIndexNum >= 0,
-  });
-
   const { data: description } = useQuery({
     queryKey: ['clipDescription', projectId, clipIndexNum],
     queryFn: () => getClipDescription(projectId!, clipIndexNum),
@@ -297,46 +283,9 @@ export const ClipDetail: React.FC = () => {
     hasTitle &&
     overlay.enabled &&
     (isEditingOverlay || !playsRendered || !highlight.overlay_burned);
-  // The thumbnail dialog picks a frame, so it needs a player of its own: the
-  // one on this page is behind the scrim and cannot be scrubbed through it.
-  //
-  // Pointed at the source rather than the cut file, because that is where the
-  // frame is actually taken from — the thumbnail is one frame of the source
-  // under the clipper's crop, and a cut file already carrying burned words
-  // would show them twice over the dialog's own drawing. The rendered clip
-  // only stands in when the source has gone.
-  const thumbnailPreview: CaptionPreviewSource | null = sourceUrl
-    ? {
-        src: sourceUrl,
-        start: highlight.start,
-        end: highlight.end,
-        isPreview: true,
-        aspectRatio,
-        label,
-      }
-    : renderedFilename
-      ? {
-          src: getClipVideoUrl(projectId!, renderedFilename, highlight.rendered_at),
-          start: 0,
-          end: null,
-          isPreview: false,
-          aspectRatio,
-          label,
-        }
-      : null;
-  // Project-wide, not per clip: whether a still clip shows its thumbnail or the
-  // frame it is parked on is a decision about reviewing this project.
-  const showThumbnailWhenIdle = (projectMetadata.settings?.clip_preview ?? 'thumbnail') === 'thumbnail';
-  // The still is cut from the source, not from this clip's file, so a project
-  // whose original video has gone cannot show one.
-  const thumbnailWhileStill = showThumbnailWhenIdle && !!thumbnail && !!sourceUrl;
 
   const socialPosts = [
     { label: 'YouTube title', content: highlight.video_title_for_youtube_short },
-    // Not a post, but written by the same step and read for the same reason:
-    // it is what the still says, and the still is what anyone decides to click.
-    // Shown with its asterisks in, because the marked word is the point.
-    { label: 'Thumbnail text', content: highlight.thumbnail_text },
     { label: 'X post', content: highlight.video_description_for_x },
     { label: 'Reddit', content: highlight.video_description_for_reddit },
     { label: 'LinkedIn', content: highlight.video_description_for_linkedin },
@@ -400,32 +349,8 @@ export const ClipDetail: React.FC = () => {
                 label={label}
                 cues={captions?.cues}
                 renderOverlay={
-                  showOverlay || showTitle || thumbnailWhileStill
+                  showOverlay || showTitle
                     ? (position, isPlaying) => {
-                        // Before anyone presses play, this page shows the
-                        // thumbnail: its own frame of the source, with the text
-                        // the burn would draw on it. Playing, or scrubbing
-                        // anywhere, hands the picture back to the video. The
-                        // overlay editor is the exception — it is placing the
-                        // video's own title, and has to see the video.
-                        if (
-                          thumbnailWhileStill &&
-                          !isEditingOverlay &&
-                          !isPlaying &&
-                          position < 0.05
-                        ) {
-                          return (
-                            <ThumbnailPreview
-                              src={sourceUrl as string}
-                              sourceTime={highlight.start + thumbnail!.settings.frame_time}
-                              aspectRatio={aspectRatio}
-                              settings={thumbnail!.settings}
-                              title={thumbnail!.title}
-                              font={thumbnail!.title_font}
-                              captions={captions}
-                            />
-                          );
-                        }
                         return (
                           <>
                             {showOverlay && (
@@ -541,7 +466,6 @@ export const ClipDetail: React.FC = () => {
             postizChannels={highlight.postiz_channels}
             hasOverlay={hasTitle}
             onEditOverlay={() => setIsEditingOverlay(true)}
-            onEditThumbnail={() => setIsEditingThumbnail(true)}
             onTrim={() => setIsTrimming(true)}
             needsRecut={needsRecut}
           />
@@ -562,16 +486,6 @@ export const ClipDetail: React.FC = () => {
             isBurned={!!highlight.overlay_burned}
             isLocked={captions?.overlay_locked ?? false}
           />
-          <ThumbnailEditor
-            projectId={projectId!}
-            clipIndex={clipIndexNum}
-            isOpen={isEditingThumbnail}
-            onClose={() => setIsEditingThumbnail(false)}
-            // Its own picture to scrub: the player on this page is behind the
-            // dialog's scrim, and picking a frame means moving the playhead.
-            preview={thumbnailPreview}
-            captions={captions}
-          />
           <ClipTrimmer
             projectId={projectId!}
             clipIndex={clipIndexNum}
@@ -579,8 +493,7 @@ export const ClipDetail: React.FC = () => {
             onClose={() => setIsTrimming(false)}
             start={highlight.start}
             end={highlight.end}
-            // Its own picture, like the thumbnail dialog: the player on this
-            // page is behind the scrim, and trimming means watching the edges.
+            // Its own picture: the player on this page is behind the scrim, and trimming means watching the edges.
             // Always the source — the window is a position in it, and a cut
             // file has nothing outside itself to trim back into.
             sourceUrl={sourceUrl}

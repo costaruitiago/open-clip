@@ -35,9 +35,8 @@ interface ClipPlayerProps {
   /**
    * Where inside the window to park on load, in seconds from `start`.
    *
-   * For picking a frame rather than watching one: a player opened to choose a
-   * thumbnail has to open on the frame already chosen, not rewind to the top
-   * of the clip and claim that is the choice.
+   * For picking a frame rather than watching one: a player opened on a chosen
+   * frame has to open there, not rewind to the top of the clip.
    */
   initialOffset?: number;
   /** Reports the playhead, so a caller can act on the frame being shown. */

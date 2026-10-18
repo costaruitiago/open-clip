@@ -7,7 +7,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   getProjectMetadata,
   getClipCaptions,
-  getClipThumbnail,
   regenerateClip,
   syncPostiz,
   updateClipOverlay,
@@ -118,53 +117,6 @@ vi.mock('../../api', () => ({
     max_width_pct: 86,
   },
   getStudioEditUrl: (videoId: string) => `https://studio.youtube.com/video/${videoId}/edit`,
-  getClipThumbnail: vi.fn().mockResolvedValue({
-    settings: {
-      frame_time: 0,
-      show_captions: false,
-      show_overlay: true,
-      extra: null,
-      generated_filename: null,
-      generated_at: null,
-    },
-    title: null,
-    title_font: null,
-    duration: 4,
-    exists: false,
-  }),
-  updateClipThumbnail: vi.fn().mockResolvedValue({ status: 'success', thumbnail: null }),
-  generateClipThumbnail: vi.fn(),
-  getClipThumbnailUrl: (projectId: string, filename: string, version?: string | null) =>
-    `/static/${projectId}/thumbnails/${filename}${version ? `?v=${version}` : ''}`,
-  // Inline for the same reason the overlay defaults are: the factory is
-  // hoisted above every const in this file.
-  DEFAULT_THUMBNAIL: {
-    frame_time: 0,
-    show_captions: false,
-    show_overlay: true,
-    extra: null,
-    generated_filename: null,
-    generated_at: null,
-  },
-  DEFAULT_THUMBNAIL_EXTRA: {
-    enabled: true,
-    text: '',
-    start: 0,
-    duration: 3,
-    fade_in: 0,
-    fade_out: 0.6,
-    font_family: 'Arial Black',
-    font_size_pct: 6,
-    bold: true,
-    italic: false,
-    uppercase: true,
-    text_color: '#FFFFFF',
-    outline_color: '#000000',
-    outline_pct: 0.6,
-    box_color: null,
-    position_pct: 55,
-    max_width_pct: 86,
-  },
 }));
 
 const highlight = (overrides: Partial<Highlight> = {}): Highlight => ({
@@ -186,10 +138,7 @@ const project = (highlights: Highlight[]): ProjectMetadata => ({
   name: 'test',
   created_at: '2026-01-01T00:00:00',
   files: { original_file: 'original.mp4' },
-  // Showing the footage, which is what the tests below are about: a still
-  // player in the other mode is standing in for the thumbnail and draws that
-  // instead of the video's own captions and title.
-  settings: { aspect_ratio: '9:16', resolution: 'keep original', clip_preview: 'video' },
+  settings: { aspect_ratio: '9:16', resolution: 'keep original' },
   highlights,
 });
 
@@ -243,20 +192,6 @@ describe('ClipDetail Component', () => {
     vi.mocked(syncPostiz).mockReset();
     vi.mocked(syncPostiz).mockResolvedValue({ checked: true, clips: {} });
     vi.mocked(getClipCaptions).mockResolvedValue(captionsWith(null));
-  });
-
-  // The still is what anyone decides to click, so the words on it belong with
-  // the rest of the writing rather than only inside the thumbnail dialog. The
-  // asterisks stay in: the marked word is the point of the line.
-  it('shows the model\'s thumbnail line with its mark', async () => {
-    vi.mocked(getProjectMetadata).mockResolvedValue(
-      project([highlight({ thumbnail_text: 'we *lost* it' })])
-    );
-
-    renderDetail('0');
-
-    expect(await screen.findByText('Thumbnail text')).toBeDefined();
-    expect(screen.getByText('we *lost* it')).toBeDefined();
   });
 
   // Nothing tells this application when a draft in Postiz is sent, so until the
@@ -626,7 +561,6 @@ describe('ClipDetail Component', () => {
         highlight({
           viral_hook_text: 'HOOK',
           video_title_for_youtube_short: undefined,
-          thumbnail_text: undefined,
           video_description_for_x: undefined,
           video_description_for_reddit: undefined,
           video_description_for_linkedin: undefined,
@@ -638,7 +572,7 @@ describe('ClipDetail Component', () => {
 
     // Matched on "Not written yet" rather than on the step: the YouTube
     // description below names the same step and is not one of these.
-    expect((await screen.findAllByText(/Not written yet/i)).length).toBe(5);
+    expect((await screen.findAllByText(/Not written yet/i)).length).toBe(4);
   });
 
   it('falls back to naming the transcribe step when a highlight has no text', async () => {
@@ -945,65 +879,6 @@ describe('ClipDetail Component', () => {
       renderDetail('0');
 
       expect(await screen.findByText(/Regenerate the clip to burn it in/i)).toBeDefined();
-    });
-  });
-
-  // What the page opens on is the thumbnail: the frame it is taken from, with
-  // the text the burn would draw on it. Nothing is rendered to show that — the
-  // picture is not made until the clip is published.
-  describe('the still the page opens on', () => {
-    const cut = (mode: 'thumbnail' | 'video') => ({
-      ...project([highlight({ is_clip_generated: true, generated_clip_filename: 'first.mp4' })]),
-      settings: { aspect_ratio: '9:16', resolution: 'keep original', clip_preview: mode },
-    });
-
-    beforeEach(() => {
-      vi.mocked(getClipThumbnail).mockResolvedValue({
-        settings: {
-          frame_time: 4,
-          show_captions: false,
-          show_overlay: true,
-          extra: null,
-          generated_filename: null,
-          generated_at: null,
-        },
-        title: { ...overlayText, text: 'Cold open' },
-        title_font: captionFont,
-        duration: 10,
-        exists: false,
-      });
-    });
-
-    it('draws the thumbnail over the player until it is played', async () => {
-      vi.mocked(getProjectMetadata).mockResolvedValue(cut('thumbnail'));
-
-      renderDetail('0');
-
-      expect(await screen.findByText('Cold open')).toBeDefined();
-    });
-
-    it('takes its frame from the source rather than from the cut clip', async () => {
-      vi.mocked(getProjectMetadata).mockResolvedValue(cut('thumbnail'));
-
-      renderDetail('0');
-      await screen.findByText('Cold open');
-
-      // The thumbnail is a frame of the original under the clipper's crop, so
-      // whatever the clip file has burned into it — subtitles, a title — is
-      // not part of this picture and is not shown as if it were.
-      const still = Array.from(document.querySelectorAll('video')).find((video) => video.muted);
-      expect(still?.getAttribute('src')).toContain('original.mp4');
-      // The highlight starts at 0 and the thumbnail is 4s into the clip.
-      expect(still?.currentTime).toBe(4);
-    });
-
-    it('leaves the footage showing when the project asks for it', async () => {
-      vi.mocked(getProjectMetadata).mockResolvedValue(cut('video'));
-
-      renderDetail('0');
-      await screen.findByLabelText(/Position within/i);
-
-      expect(screen.queryByText('Cold open')).toBeNull();
     });
   });
 });

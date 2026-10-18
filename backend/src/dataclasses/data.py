@@ -182,9 +182,7 @@ class OverlayText:
     # A hard offset shadow, drawn down and right with no blur, the way the
     # caption style's is. It is what makes a title read as sitting *over* the
     # picture rather than printed onto it — and, unlike a fade or a scale-up,
-    # it is still there in one frame. That matters because this same object is
-    # drawn on the thumbnail, which is a single frame and has no motion to
-    # show: any pop that depends on time is a pop the thumbnail never gets.
+    # it is still there in one frame.
     shadow_color: str = "#000000"
     shadow_pct: float = 0.8
     # One word in a second colour is what a thumbnail that gets clicked does:
@@ -242,56 +240,6 @@ class OverlayText:
         )
 
 
-@dataclass
-class ThumbnailSettings:
-    """The still picture that stands for one clip, and how it is built.
-
-    Every field has a default that produces something publishable without the
-    user touching anything: the first frame of the clip, no subtitles, and the
-    clip's own title drawn over it. That is the whole point of the defaults —
-    a clip that is never opened still gets a thumbnail, and the settings here
-    only describe departures from it.
-
-    `frame_time` is seconds from the start of the clip, like an overlay's
-    times, not a position in the source video. `extra` is a second piece of
-    text the user adds for the thumbnail alone; it never reaches the video.
-    """
-
-    frame_time: float = 0.0
-    # Off by default: a caption caught mid-sentence is the one thing a
-    # thumbnail does not need, and the words are legible in the video itself.
-    show_captions: bool = False
-    show_overlay: bool = True
-    extra: Optional[OverlayText] = None
-    # What the last render produced, or None while none has been made. The
-    # filename does not change between renders, so `generated_at` is what a
-    # browser holding the previous image is told about the new one.
-    generated_filename: Optional[str] = None
-    generated_at: Optional[str] = None
-
-    def to_dict(self) -> Dict[str, Any]:
-        data = asdict(self)
-        data["extra"] = self.extra.to_dict() if self.extra else None
-        return data
-
-    @classmethod
-    def from_dict(cls, data: Any) -> 'ThumbnailSettings':
-        if not isinstance(data, dict):
-            return cls()
-        defaults = cls()
-        extra = data.get("extra")
-        return cls(
-            # An hour is well past any short; the clip's own length bounds it
-            # again at render time, where the duration is actually known.
-            frame_time=_bounded(data.get("frame_time", defaults.frame_time), 0.0, 3600.0, defaults.frame_time),
-            show_captions=bool(data.get("show_captions", defaults.show_captions)),
-            show_overlay=bool(data.get("show_overlay", defaults.show_overlay)),
-            extra=OverlayText.from_dict(extra) if isinstance(extra, dict) else None,
-            generated_filename=data.get("generated_filename") or None,
-            generated_at=data.get("generated_at") or None,
-        )
-
-
 # The shortest window a trim may leave behind. The model picks a highlight worth
 # publishing; the trim only nudges its edges, and a window shorter than this is
 # a slip of a nudge button rather than an edit anybody meant.
@@ -314,15 +262,6 @@ class Highlight:
     # edit. Defaulted because it sits after `start`/`end` and because every
     # highlight produced before this field existed simply has none.
     video_description_for_youtube_short: str = ""
-    # The words for the still image, which is the thing anyone decides to click
-    # on. Separate from `viral_hook_text` because the two are read under
-    # different conditions: the hook is laid over the opening seconds of a video
-    # that is already playing, while this is read at about 120 pixels wide in a
-    # feed, with no sound and no context. That makes it shorter, blunter, and
-    # carrying one word marked with asterisks for the renderer to colour.
-    # Defaulted because every highlight produced before this field existed has
-    # none, and the thumbnail falls back to the hook for those.
-    thumbnail_text: str = ""
     is_clip_generated: bool = False
     generated_clip_filename: Optional[str] = None
     # What a YouTube upload of this clip produced, or None while it has never
@@ -426,10 +365,6 @@ class Highlight:
     # over the old footage is a lie the user has no way to spot. Later than
     # `rendered_at` is what "this clip needs cutting again" means.
     trimmed_at: Optional[str] = None
-    # How this clip's thumbnail is built, or None for a clip nobody has chosen
-    # a frame for. None is not "no thumbnail": it means the defaults, which is
-    # exactly what a thumbnail rendered without any input uses.
-    thumbnail: Optional[ThumbnailSettings] = None
     # What Jev answered about this clip when Jev picked it — hook, arc, the
     # combined score, and the loop probability with whether the cut used it —
     # or None for a clip Gemini picked.
@@ -441,7 +376,6 @@ class Highlight:
         # a plain dict, which is exactly the shape from_json reads back.
         data["captions"] = self.captions.to_dict() if self.captions else None
         data["overlay"] = self.overlay.to_dict() if self.overlay else None
-        data["thumbnail"] = self.thumbnail.to_dict() if self.thumbnail else None
         return data
 
     @classmethod
@@ -461,7 +395,6 @@ class Highlight:
             video_description_for_linkedin=data.get("video_description_for_linkedin", ""),
             video_title_for_youtube_short=data.get("video_title_for_youtube_short", ""),
             video_description_for_youtube_short=data.get("video_description_for_youtube_short", ""),
-            thumbnail_text=data.get("thumbnail_text", ""),
             start=_as_seconds(data.get("start")),
             end=_as_seconds(data.get("end")),
             is_clip_generated=data.get("is_clip_generated", False),
@@ -519,13 +452,6 @@ class Highlight:
             # Absent for every clip whose window is still the one the model
             # picked, which is every clip written before trimming existed.
             trimmed_at=data.get("trimmed_at"),
-            # Absent for every clip whose thumbnail has never been touched,
-            # which reads as "the defaults" rather than as "none".
-            thumbnail=(
-                ThumbnailSettings.from_dict(data["thumbnail"])
-                if isinstance(data.get("thumbnail"), dict)
-                else None
-            ),
             jev_scores=data.get("jev_scores") if isinstance(data.get("jev_scores"), dict) else None,
         )
 
@@ -903,11 +829,6 @@ class UploadSettings:
         )
 
 
-# What a clip shows while it is sitting still: its thumbnail, or the video
-# frame it is parked on. A project chooses once for all of its clips, because
-# the choice is about how the project is reviewed rather than about one clip.
-CLIP_PREVIEW_CHOICES = ("thumbnail", "video")
-
 # How a widescreen source fills a taller frame: one window cropped around the
 # subject, the whole frame in the middle with darkened copies of it stacked
 # above and below, or the source cut into a left and a right part stacked one
@@ -964,10 +885,6 @@ class ProjectSettings:
     # scheduled — when that differs from the application's answer. Empty means
     # "follow Settings", the way the Postiz block does.
     upload: UploadSettings = field(default_factory=UploadSettings)
-    # Thumbnail by default: a grid of stills is what the shorts will look like
-    # in a feed, which is the question being asked while reviewing them. The
-    # video frame is one click away either way.
-    clip_preview: str = "thumbnail"
     # Crop by default, which is what every project rendered before stacking
     # existed. Stacking only changes a render whose frame is taller than the
     # source; anything else is cropped whatever this says.
@@ -992,7 +909,6 @@ class ProjectSettings:
         Projects created before a settings field existed simply do not carry it,
         so every field other than the two originals has a default.
         """
-        preview = data.get("clip_preview")
         return cls(
             aspect_ratio=data.get("aspect_ratio", "keep original"),
             resolution=data.get("resolution", "keep original"),
@@ -1005,10 +921,6 @@ class ProjectSettings:
             highlights=HighlightSettings.from_dict(data.get("highlights")),
             postiz=PostizSettings.from_dict(data.get("postiz")),
             upload=UploadSettings.from_dict(data.get("upload")),
-            # Anything else — a typo, a value from a later version — reads as
-            # the default rather than reaching the page as a state it cannot
-            # draw.
-            clip_preview=preview if preview in CLIP_PREVIEW_CHOICES else "thumbnail",
             layout=data.get("layout") if data.get("layout") in LAYOUT_CHOICES else "crop",
             stack_darkness=as_stack_darkness(data.get("stack_darkness")),
             split_position=as_split_position(data.get("split_position")),
@@ -1260,10 +1172,9 @@ class Project:
         `trimmed_at` is stamped: it is what tells the grid the file has fallen
         behind the numbers beside it.
 
-        Everything timed from the start of the clip moves with it. The caption
+        Everything timed from the start of the clip moves with it: the caption
         cues are rebuilt from the word map on every read, so they follow by
-        themselves; the thumbnail's chosen frame is stored, so it is pulled back
-        inside the new window here rather than silently pointing past the end.
+        themselves.
 
         Only the near edge is bounded: `start` cannot go negative, and the window
         cannot close below `CLIP_MIN_DURATION`. The far edge is not, because
@@ -1296,11 +1207,6 @@ class Project:
             entry["start"] = new_start
             entry["end"] = new_end
             entry["trimmed_at"] = stamp
-            thumbnail = entry.get("thumbnail")
-            if isinstance(thumbnail, dict):
-                thumbnail["frame_time"] = _bounded(
-                    thumbnail.get("frame_time", 0.0), 0.0, new_end - new_start, 0.0
-                )
             trimmed.update(entry)
             data["highlights"] = highlights
 
@@ -1313,10 +1219,6 @@ class Project:
             highlight.start = new_start
             highlight.end = new_end
             highlight.trimmed_at = stamp
-            if highlight.thumbnail is not None:
-                highlight.thumbnail.frame_time = _bounded(
-                    highlight.thumbnail.frame_time, 0.0, new_end - new_start, 0.0
-                )
         return trimmed
 
     def delete_highlight(self, index: int):
@@ -1338,9 +1240,6 @@ class Project:
             if index < 0 or index >= len(highlights):
                 raise IndexError(f"No highlight at index {index}")
             removed["filename"] = highlights[index].get("generated_clip_filename")
-            thumbnail = highlights[index].get("thumbnail")
-            if isinstance(thumbnail, dict):
-                removed["thumbnail"] = thumbnail.get("generated_filename")
             del highlights[index]
             data["highlights"] = highlights
 
@@ -1353,14 +1252,6 @@ class Project:
         filename = removed.get("filename")
         if filename:
             Path(self.get_clip_path(filename)).unlink(missing_ok=True)
-
-        # The still goes with the clip it stood for, by the same rule: the
-        # entry is gone from metadata.json first, so a failed unlink cannot
-        # leave a picture the UI still lists. The directory is named here
-        # rather than imported from Thumbnailer, which imports this module.
-        thumbnail = removed.get("thumbnail")
-        if thumbnail:
-            (Path(self.base_directory) / self.project_id / "thumbnails" / thumbnail).unlink(missing_ok=True)
 
         if index < len(self.highlights):
             del self.highlights[index]

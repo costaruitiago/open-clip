@@ -11,7 +11,6 @@ from typing import List, Optional, Tuple
 from urllib.parse import urlparse, parse_qs
 
 from backend.src.dataclasses.data import (
-    CLIP_PREVIEW_CHOICES,
     LAYOUT_CHOICES,
     CaptionSettings,
     DescriptionSettings,
@@ -21,7 +20,6 @@ from backend.src.dataclasses.data import (
     as_stack_darkness,
     PostizSettings,
     Project,
-    ThumbnailSettings,
     UploadSettings,
 )
 from backend.src.infrastructure.font_metrics import resolve_face
@@ -38,7 +36,6 @@ from backend.src.infrastructure.youtube_auth import (
     token_status,
 )
 from backend.src.services.captions import CaptionService
-from backend.src.services.thumbnailer import SourceVideoMissingError, Thumbnailer
 from backend.src.services.uploader import (
     DEFAULT_PRIVACY,
     UploadInProgressError,
@@ -63,7 +60,6 @@ from backend.src.orchestrator import (
     DONE_STATUSES,
     ClipRegenerationInProgressError,
     PipelineOrchestrator,
-    ThumbnailInProgressError,
 )
 from backend.src.settings_manager import settings_manager
 
@@ -128,11 +124,6 @@ pipeline_orchestrator = PipelineOrchestrator(active_processes=active_processes)
 # Caption cues and styles are read on every preview request, so this is shared
 # rather than built per request.
 caption_service = CaptionService()
-
-# The thumbnail settings and the automatic title are read on every clip page,
-# so this is shared too. It draws through the caption service above, which is
-# what keeps a thumbnail's words styled like the clip's.
-thumbnail_service = Thumbnailer(caption_service)
 
 # The consent last started, which is the one the page reports on, and every
 # consent still waiting for a browser. More than one can be open at once: a
@@ -243,9 +234,8 @@ class SimpleHandler(BaseHTTPRequestHandler):
         """Whether a channel is connected, and what it was allowed to do.
 
         `missing_scopes` is what the page shows: a token authorised before a
-        scope was added still uploads, so this is not a broken connection — it
-        is the reason a thumbnail may not survive processing, and reconnecting
-        is the only thing that can grant it.
+        scope was added still uploads, so this is not a broken connection, and
+        reconnecting is the only thing that can grant it.
         """
         status = token_status()
         status["has_client_secrets"] = bool(settings_manager.get("youtube_client_secrets"))
@@ -381,8 +371,8 @@ class SimpleHandler(BaseHTTPRequestHandler):
                 file_path = Path(project.base_directory) / project_id / rel_path
 
             if file_path.exists() and file_path.is_file():
-                # Thumbnails are served from here too, and an <img> pointed at
-                # an octet-stream is a download rather than a picture.
+                # An <img> pointed at an octet-stream is a download rather
+                # than a picture.
                 mime = {
                     '.mp4': 'video/mp4',
                     '.jpg': 'image/jpeg',
@@ -670,119 +660,12 @@ class SimpleHandler(BaseHTTPRequestHandler):
             f"{self.safe_project_name(project)}_clip_{index:03d}.ass",
         )
 
-    def handle_get_clip_thumbnail(self):
-        """One clip's thumbnail: its settings, its automatic title, its image.
-
-        The title comes from here rather than being worked out in the browser,
-        for the same reason the caption cues do: the page must show the text
-        that will actually be drawn, including the model's hook standing in for
-        a clip whose own title was never written.
-        """
-        try:
-            project, highlight, index = self._highlight_from_path(4)
-        except (IndexError, ValueError):
-            self.send_cors_error(404, "No clip at that index")
-            return
-        except FileNotFoundError:
-            self.send_cors_error(404, "Project not found")
-            return
-
-        try:
-            payload = thumbnail_service.preview(project, highlight)
-        except Exception as e:
-            logger.exception("Failed to describe clip thumbnail")
-            self.send_cors_error(500, f"Failed to read the thumbnail: {str(e)}")
-            return
-
-        path = thumbnail_service.path(project, highlight)
-        # Reported as missing when the file is gone, so the page offers to make
-        # one rather than pointing an <img> at a 404.
-        payload["exists"] = bool(path and path.exists())
-        self.send_json_response(payload)
-
-    def handle_post_thumbnail(self):
-        """Renders one clip's thumbnail now, with whatever its settings say."""
-        parts = urlparse(self.path).path.split('/')
-        try:
-            project_id, clip_index = parts[2], int(parts[4])
-        except (IndexError, ValueError):
-            self.send_cors_error(404, "No clip at that index")
-            return
-
-        try:
-            thumbnail = pipeline_orchestrator.generate_thumbnail(project_id, clip_index)
-            self.send_json_response({"status": "success", "thumbnail": thumbnail})
-        except FileNotFoundError:
-            self.send_cors_error(404, "Project not found")
-        except IndexError:
-            self.send_cors_error(404, "No clip at that index")
-        except SourceVideoMissingError as e:
-            self.send_cors_error(409, str(e))
-        except ThumbnailInProgressError as e:
-            self.send_cors_error(409, str(e))
-        except Exception as e:
-            logger.exception(f"Thumbnail failed for project={project_id} clip={clip_index}")
-            self.send_cors_error(500, f"Could not make the thumbnail: {str(e)}")
-
-    def handle_put_clip_thumbnail(self):
-        """One clip's thumbnail settings, or null to go back to the defaults.
-
-        Null is not "no thumbnail": the defaults are the first frame with the
-        clip's title on it, which is what a clip nobody has opened publishes.
-        """
-        parts = urlparse(self.path).path.split('/')
-        try:
-            project_id, clip_index = parts[2], int(parts[4])
-        except (IndexError, ValueError):
-            self.send_cors_error(404, "No clip at that index")
-            return
-
-        content_length = int(self.headers.get('Content-Length', 0))
-        data = json.loads(self.rfile.read(content_length)) if content_length else {}
-        try:
-            project = Project(project_id)
-            highlights = project.highlights
-            if clip_index < 0 or clip_index >= len(highlights):
-                self.send_cors_error(404, f"No clip at index {clip_index}")
-                return
-
-            payload = data.get('thumbnail')
-            if isinstance(payload, dict):
-                stored = highlights[clip_index].thumbnail
-                settings = ThumbnailSettings.from_dict(payload)
-                # The rendered file is not the form's to change: a settings
-                # save describes the *next* thumbnail, and dropping these would
-                # orphan the image already on disk.
-                if stored is not None:
-                    settings.generated_filename = stored.generated_filename
-                    settings.generated_at = stored.generated_at
-                highlights[clip_index].thumbnail = settings
-            else:
-                highlights[clip_index].thumbnail = None
-
-            project.set_property("highlights", highlights)
-            self.send_json_response({
-                "status": "success",
-                # Sanitized on the way back, like the overlay: the form shows
-                # the numbers that will be used, not the ones it asked for.
-                "thumbnail": (
-                    highlights[clip_index].thumbnail.to_dict()
-                    if highlights[clip_index].thumbnail
-                    else None
-                ),
-            })
-        except FileNotFoundError:
-            self.send_cors_error(404, "Project not found")
-        except Exception as e:
-            logger.exception("Failed to update clip thumbnail")
-            self.send_cors_error(500, f"Failed to update the thumbnail: {str(e)}")
-
     def handle_get_clip_publication(self):
         """Whether this clip's published video is still on YouTube.
 
         Asked when a clip is opened. Nothing tells this application when a
         video it published is deleted, so without this the clip page offers a
-        dead link and a thumbnail button pointed at nothing, indefinitely.
+        dead link, indefinitely.
 
         A video that has gone takes its record with it — see
         `Uploader.verify_publication`. `checked` is false when the question
@@ -898,8 +781,6 @@ class SimpleHandler(BaseHTTPRequestHandler):
             self.handle_get_postiz_sync()
         elif self.path.startswith('/project/') and urlparse(self.path).path.endswith('/description'):
             self.handle_get_clip_description()
-        elif self.path.startswith('/project/') and urlparse(self.path).path.endswith('/thumbnail'):
-            self.handle_get_clip_thumbnail()
         elif self.path.startswith('/project/'):
             self.handle_get_project_detail()
         else: self.send_error(404)
@@ -930,12 +811,6 @@ class SimpleHandler(BaseHTTPRequestHandler):
             **(settings_manager.get('overlay_defaults') or {}),
             "text": "",
         })
-        # Anything else — a key from a later version, a typo typed into the
-        # settings file — leaves the project on the shipped default rather than
-        # reaching the page as a state it cannot draw.
-        preview = settings_manager.get('clip_preview_default')
-        if preview in CLIP_PREVIEW_CHOICES:
-            project.settings.clip_preview = preview
         project.save()
         self.send_json_response({"project_id": project.project_id})
 
@@ -1175,14 +1050,6 @@ class SimpleHandler(BaseHTTPRequestHandler):
                 project.settings.resolution = data['resolution']
             if 'aspect_ratio' in data:
                 project.settings.aspect_ratio = data['aspect_ratio']
-            if 'clip_preview' in data:
-                # Validated on the way in rather than trusted: this reaches the
-                # page as the state every clip player is drawn from.
-                project.settings.clip_preview = (
-                    data['clip_preview']
-                    if data['clip_preview'] in CLIP_PREVIEW_CHOICES
-                    else project.settings.clip_preview
-                )
             if 'layout' in data and data['layout'] in LAYOUT_CHOICES:
                 project.settings.layout = data['layout']
             if 'stack_darkness' in data:
@@ -1297,8 +1164,6 @@ class SimpleHandler(BaseHTTPRequestHandler):
             self.handle_put_clip_captions()
         elif path.startswith('/project/') and path.endswith('/overlay'):
             self.handle_put_clip_overlay()
-        elif path.startswith('/project/') and path.endswith('/thumbnail'):
-            self.handle_put_clip_thumbnail()
         elif path.startswith('/project/') and path.endswith('/trim'):
             self.handle_put_clip_trim()
         elif path.startswith('/project/') and path.endswith('/settings'):
@@ -1316,7 +1181,6 @@ class SimpleHandler(BaseHTTPRequestHandler):
         elif self.path.endswith('/upload'): self.handle_post_upload_clip()
         elif self.path.endswith('/postiz'): self.handle_post_postiz_clip()
         elif self.path.endswith('/regenerate'): self.handle_post_regenerate_clip()
-        elif urlparse(self.path).path.endswith('/thumbnail'): self.handle_post_thumbnail()
         elif self.path == '/settings':
              content_length = int(self.headers.get('Content-Length', 0))
              data = json.loads(self.rfile.read(content_length))

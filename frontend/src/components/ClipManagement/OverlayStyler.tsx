@@ -43,11 +43,6 @@ const DEFAULT_PROJECT_OVERLAY: OverlayText = {
  * cannot be the same on every short, so they belong to the clip; a line stored
  * here would be one line over the whole project at once.
  *
- * It is what every clip is drawn in: the thumbnails, whose words the model
- * writes, immediately; a clip's own title from the moment it is written. So a
- * project's stills look like one project without anybody typing a title on any
- * of them.
- *
  * Every change is written to the project rather than held in the page: the
  * clipper reads the same stored settings when it burns the title in, so what is
  * on screen is a promise about the render. Writes are debounced because a
@@ -70,9 +65,6 @@ export const OverlayStyler: React.FC<OverlayStylerProps> = ({ projectId, overlay
       queryClient.invalidateQueries({ queryKey: ['project', projectId] });
       queryClient.invalidateQueries({ queryKey: ['projectMetadata', projectId] });
       queryClient.invalidateQueries({ queryKey: ['clipCaptions', projectId] });
-      // The stills, which is where a look change actually shows: their titles
-      // are resolved by the backend, and the cards draw thumbnails by default.
-      queryClient.invalidateQueries({ queryKey: ['clipThumbnail', projectId] });
     },
   });
 
@@ -101,7 +93,7 @@ export const OverlayStyler: React.FC<OverlayStylerProps> = ({ projectId, overlay
 
   // The trigger has to say what the dialog behind it would show, and the one
   // thing worth knowing from outside it is whether titles reach the video at
-  // all: the look is visible on every card either way, through the thumbnails.
+  // all.
   const badge = (
     <span
       className="status-badge"
@@ -134,10 +126,9 @@ export const OverlayStyler: React.FC<OverlayStylerProps> = ({ projectId, overlay
       <Modal isOpen={isOpen} title="Project overlay titles" onClose={close}>
         <p style={{ margin: '0 0 var(--space-md) 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
           How every title in this project is drawn. The words belong to the clip — write them
-          with <strong>Add overlay text</strong> on a clip, or let the thumbnails use the line the
-          model wrote. {current.enabled
+          with <strong>Add overlay text</strong> on a clip. {current.enabled
             ? 'Titles are burned into rendered clips; regenerate a clip to apply a change to its file.'
-            : 'Titles are not burned into the video, only drawn on the thumbnails.'}
+            : 'Titles are not burned into the video.'}
         </p>
 
         <OverlayControls

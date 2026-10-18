@@ -47,13 +47,6 @@ describe('ProjectSettingsMenu', () => {
 
     expect(screen.getByLabelText(/Resolution/i)).toBeDefined();
     expect(screen.getByLabelText(/Aspect Ratio/i)).toBeDefined();
-    expect(screen.getByLabelText(/Card preview/i)).toBeDefined();
-  });
-
-  it('offers a project-wide choice between the thumbnail and the footage', () => {
-    renderMenu();
-
-    expect((screen.getByLabelText(/Card preview/i) as HTMLSelectElement).value).toBe('thumbnail');
   });
 
   // Disabling the select the user is standing in hands focus to the document
@@ -70,7 +63,6 @@ describe('ProjectSettingsMenu', () => {
 
     expect(resolution.disabled).toBe(false);
     expect((screen.getByLabelText(/Aspect Ratio/i) as HTMLSelectElement).disabled).toBe(false);
-    expect((screen.getByLabelText(/Card preview/i) as HTMLSelectElement).disabled).toBe(false);
   });
 
   // The value comes from the project, which has not been refetched yet — so

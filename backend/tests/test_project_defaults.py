@@ -88,19 +88,6 @@ def test_a_new_project_draws_no_titles_when_nothing_was_promoted(server, app_set
     assert create_project(server)["settings"]["overlay"]["enabled"] is False
 
 
-def test_a_new_project_starts_on_the_promoted_card_preview(server, app_settings):
-    app_settings["clip_preview_default"] = "video"
-
-    assert create_project(server)["settings"]["clip_preview"] == "video"
-
-
-@pytest.mark.parametrize("promoted", ["filmstrip", "", None, 3])
-def test_a_card_preview_this_app_cannot_draw_leaves_the_shipped_one(server, app_settings, promoted):
-    app_settings["clip_preview_default"] = promoted
-
-    assert create_project(server)["settings"]["clip_preview"] == "thumbnail"
-
-
 def test_a_new_project_starts_from_the_promoted_frame(server, app_settings):
     """The upload screen no longer asks, so the defaults are the whole answer."""
     app_settings["video_defaults"] = {"resolution": "1080p", "aspect_ratio": "9:16"}

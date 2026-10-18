@@ -114,11 +114,10 @@ export const DEFAULT_OVERLAY_TEXT: OverlayText = {
   text_color: '#FFFFFF',
   outline_color: '#000000',
   // Heavy, because the background is always moving footage rather than a flat
-  // colour — the case the thumbnail guidance says to go heavier for.
+  // colour.
   outline_pct: 0.9,
   // A title arrives with a shadow rather than being offered one: it is the
-  // difference between text sitting over the picture and text printed onto it,
-  // and it is the only lift that survives on a thumbnail's single frame.
+  // difference between text sitting over the picture and text printed onto it.
   shadow_color: '#000000',
   shadow_pct: 0.8,
   // Only drawn where a word is marked. Yellow because that is the pairing that
@@ -128,67 +127,6 @@ export const DEFAULT_OVERLAY_TEXT: OverlayText = {
   box_color: null,
   position_pct: 12,
   max_width_pct: 86,
-};
-
-/**
- * How one clip's thumbnail is built, as stored by
- * backend/src/dataclasses/data.py.
- *
- * Every field is a departure from a default that already works: the first
- * frame of the clip, no subtitles, and the clip's title over it. A clip whose
- * thumbnail is `null` is not a clip without one — it is a clip using all of
- * those defaults, which is what the clipper renders for it.
- *
- * `frame_time` is seconds from the start of the clip. `extra` is a second
- * piece of text written for the still alone; it never reaches the video.
- */
-export type ThumbnailSettings = {
-  frame_time: number;
-  show_captions: boolean;
-  show_overlay: boolean;
-  extra: OverlayText | null;
-  /** The image last rendered from these settings, or null while there is none. */
-  generated_filename: string | null;
-  generated_at: string | null;
-};
-
-/** What a thumbnail nobody has touched is made of. Mirrors the backend's. */
-export const DEFAULT_THUMBNAIL: ThumbnailSettings = {
-  frame_time: 0,
-  show_captions: false,
-  show_overlay: true,
-  extra: null,
-  generated_filename: null,
-  generated_at: null,
-};
-
-/**
- * What extra text starts as when it is first added.
- *
- * Mid-frame and smaller than a title. The title is at the top and the captions
- * sit near the bottom, so anything else has to land between them or it draws
- * over one of the two.
- */
-export const DEFAULT_THUMBNAIL_EXTRA: OverlayText = {
-  ...DEFAULT_OVERLAY_TEXT,
-  font_size_pct: 6,
-  position_pct: 55,
-};
-
-/** One clip's thumbnail as the backend describes it to the page. */
-export type ThumbnailPreview = {
-  settings: ThumbnailSettings;
-  /**
-   * The text that will be drawn, worked out by the backend: the clip's own
-   * title, or the model's hook standing in for a clip that has none.
-   */
-  title: OverlayText | null;
-  /** The face that title will be burned with. Null when there is no title. */
-  title_font: CaptionFont | null;
-  /** The clip's length, which is the range a frame can be chosen from. */
-  duration: number;
-  /** False when no image has been rendered yet, or the file has gone. */
-  exists: boolean;
 };
 
 export type CaptionPreview = {
@@ -247,12 +185,6 @@ export type Highlight = {
   end: number;
   highlight_text?: string;
   viral_hook_text?: string;
-  /**
-   * The model's words for the thumbnail: a handful, one of them wrapped in
-   * asterisks for the renderer to colour. Read at feed size with no sound and
-   * no context, which is why it is not the hook.
-   */
-  thumbnail_text?: string;
   video_title_for_youtube_short?: string;
   /** The model's description of this clip, before the template wraps it. */
   video_description_for_youtube_short?: string;
@@ -267,8 +199,6 @@ export type Highlight = {
   overlay?: OverlayText | null;
   /** True when the file's own pixels already carry that title. */
   overlay_burned?: boolean;
-  /** How this clip's thumbnail is built, or null/absent for the defaults. */
-  thumbnail?: ThumbnailSettings | null;
   /** When the file was last written. The filename never changes, so this is
    *  what tells a browser holding the previous cut that there is a new one. */
   rendered_at?: string | null;
@@ -435,15 +365,6 @@ export type HighlightProjectSettings = {
   jev_min_score?: number | null;
 };
 
-/**
- * What an idle clip shows, project-wide.
- *
- * `thumbnail` is the default: a grid of stills is what the shorts will look
- * like in a feed, which is the question a review is asking. `video` leaves the
- * frame the player is parked on, which is what you want while cutting.
- */
-export type ClipPreview = 'thumbnail' | 'video';
-
 /** How a widescreen source fills a taller frame. */
 export type Layout = 'crop' | 'stacked' | 'split';
 
@@ -501,12 +422,6 @@ export type ProjectMetadata = {
     /** What this project asks a highlights run for, when it differs from the app's. */
     highlights?: HighlightProjectSettings;
     /**
-     * What a clip shows while it is sitting still: its thumbnail, or the video
-     * frame it is parked on. One choice for the whole project, because it is
-     * about how the project is reviewed rather than about one clip.
-     */
-    clip_preview?: ClipPreview;
-    /**
      * How a widescreen source fills a taller frame: cropped around the
      * subject, kept whole between darkened copies of itself, or cut into a
      * left and a right part stacked one above the other.
@@ -546,9 +461,6 @@ export type SettingsResponse = {
     // Where a new project's title look starts — font, size, placement, colours,
     // timing — and, like the project setting it seeds, never any words.
     overlay_defaults?: Partial<OverlayText>;
-    // What a new project's clip cards show at rest. Same one-way copy as the
-    // two above: an existing project keeps whatever it chose.
-    clip_preview_default?: ClipPreview;
     // What every highlights run asks for unless a project disagrees: how many
     // segments, how long they may be, and any standing instructions. Unlike the
     // three defaults above this is read when the step runs, so editing it
@@ -838,8 +750,7 @@ export const getClipVideoUrl = (projectId: string, filename: string, version?: s
  * Whether this clip's published video is still on YouTube.
  *
  * Nothing tells this application when a video it published is deleted, so the
- * record outlives the video: a dead link on the clip page, and a thumbnail
- * button pointed at nothing. Asked when a clip is opened; a video that has gone
+ * record outlives the video: a dead link on the clip page. Asked when a clip is opened; a video that has gone
  * takes its record with it on the server, so the answer is also the fix.
  *
  * `checked` is false when the question could not be asked — no channel
@@ -1089,7 +1000,6 @@ export const updateProjectSettings = async (
     overlay?: Partial<OverlayText>;
     description?: Partial<DescriptionSettings>;
     highlights?: Partial<HighlightProjectSettings>;
-    clip_preview?: ClipPreview;
     layout?: Layout;
     stack_darkness?: number;
     split_position?: number;
@@ -1160,65 +1070,6 @@ export const updateClipTrim = async (
     method: 'PUT',
     body: JSON.stringify(window),
   });
-};
-
-/**
- * One clip's thumbnail: how it is built, what text it will carry, whether the
- * image has been rendered yet.
- */
-export const getClipThumbnail = async (
-  projectId: string,
-  clipIndex: number
-): Promise<ThumbnailPreview> => {
-  return apiRequest<ThumbnailPreview>(`/project/${projectId}/clip/${clipIndex}/thumbnail`);
-};
-
-/**
- * Saves how one clip's thumbnail should be built, or `null` for the defaults.
- *
- * Saving describes the *next* render: the image on disk is not touched until
- * `generateClipThumbnail` is called, which is why the two are separate.
- */
-export const updateClipThumbnail = async (
-  projectId: string,
-  clipIndex: number,
-  thumbnail: ThumbnailSettings | null
-): Promise<{ status: string; thumbnail: ThumbnailSettings | null }> => {
-  return apiRequest(`/project/${projectId}/clip/${clipIndex}/thumbnail`, {
-    method: 'PUT',
-    body: JSON.stringify({ thumbnail }),
-  });
-};
-
-/**
- * Renders the thumbnail now.
- *
- * Unlike a clip re-cut this resolves when the picture exists: it is one frame,
- * and the picture is the thing the user is waiting to look at.
- */
-export const generateClipThumbnail = async (
-  projectId: string,
-  clipIndex: number
-): Promise<{ status: string; thumbnail: ThumbnailSettings }> => {
-  return apiRequest(`/project/${projectId}/clip/${clipIndex}/thumbnail`, {
-    method: 'POST',
-  });
-};
-
-/**
- * A rendered thumbnail's image.
- *
- * `version` is the settings' `generated_at`. Like a re-cut clip, a re-made
- * thumbnail keeps its filename, so without it the browser shows the copy it
- * already has.
- */
-export const getClipThumbnailUrl = (
-  projectId: string,
-  filename: string,
-  version?: string | null
-) => {
-  const url = `${BASE_URL}/projects/static/${projectId}/thumbnails/${filename}`;
-  return version ? `${url}?v=${encodeURIComponent(version)}` : url;
 };
 
 /**

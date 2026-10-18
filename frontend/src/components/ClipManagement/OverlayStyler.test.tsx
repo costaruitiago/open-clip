@@ -72,7 +72,7 @@ describe('OverlayStyler', () => {
   });
 
   // The one thing worth knowing from outside the dialog is whether titles reach
-  // the video at all; the look is visible on every card through the thumbnails.
+  // the video at all.
   it('says on the trigger whether titles are burned in', () => {
     renderStyler({ ...DEFAULT_OVERLAY_TEXT, enabled: true, text: '' });
 
@@ -85,21 +85,17 @@ describe('OverlayStyler', () => {
     expect(screen.getByRole('button', { name: /Overlay titles/ })).toHaveTextContent('Off');
   });
 
-  // The look reaches the page through the stills: the backend resolves each
-  // clip's title into its thumbnail payload, and the cards draw thumbnails by
-  // default. Without this the change sat behind a five-minute staleTime and
-  // only a manual reload showed it.
-  it('marks every clip preview stale, stills included', async () => {
+  // Without this the change sat behind a five-minute staleTime and only a
+  // manual reload showed it.
+  it('marks every clip preview stale', async () => {
     renderStyler({ ...DEFAULT_OVERLAY_TEXT, enabled: false, text: '' });
     // Seeded as a card that has already fetched, which is what goes stale.
-    client.setQueryData(['clipThumbnail', 'test-project', 0], { settings: {}, title: null });
     client.setQueryData(['clipCaptions', 'test-project', 0], { cues: [] });
     open();
     drag(/^Position/, '40');
 
     await waitFor(() => expect(updateProjectSettings).toHaveBeenCalledTimes(1));
     await waitFor(() => {
-      expect(client.getQueryState(['clipThumbnail', 'test-project', 0])?.isInvalidated).toBe(true);
       expect(client.getQueryState(['clipCaptions', 'test-project', 0])?.isInvalidated).toBe(true);
     });
   });

@@ -162,10 +162,10 @@ export default function App() {
       queryClient.invalidateQueries({ queryKey: ['projectMetadata', projectId] });
       // Every per-clip query is keyed by position, and a deletion shifts each
       // later clip down one. Without this, clip N+1 keeps drawing the cached
-      // title, cues and thumbnail that were fetched for the clip that used to
-      // sit at N. The whole family goes, not just the deleted index, because
-      // every index at or after it now names a different clip.
-      for (const key of ['clipCaptions', 'clipThumbnail', 'clipDescription', 'clipPublication']) {
+      // title and cues that were fetched for the clip that used to sit at N.
+      // The whole family goes, not just the deleted index, because every index
+      // at or after it now names a different clip.
+      for (const key of ['clipCaptions', 'clipDescription', 'clipPublication']) {
         queryClient.invalidateQueries({ queryKey: [key, projectId] });
       }
     },

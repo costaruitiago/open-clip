@@ -133,19 +133,6 @@ describe('OverlayTextEditor', () => {
     });
   });
 
-  // The title written here is the first thing the thumbnail reaches for, so the
-  // still is stale the moment it saves. Without this the card kept the old one
-  // behind its staleTime until the page was reloaded by hand.
-  it('marks this clip\u2019s still stale once the title is saved', async () => {
-    render(<Harness />);
-    client.setQueryData(['clipThumbnail', 'test-project', 0], { settings: {}, title: null });
-    type('Cold open');
-    fireEvent.click(screen.getByRole('button', { name: 'Save and close' }));
-
-    await waitFor(() =>
-      expect(client.getQueryState(['clipThumbnail', 'test-project', 0])?.isInvalidated).toBe(true)
-    );
-  });
 
   it('debounces typing into one request rather than one per keystroke', async () => {
     render(<Harness />);

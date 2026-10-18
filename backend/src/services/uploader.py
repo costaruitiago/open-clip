@@ -9,7 +9,6 @@ from backend.src.services import highlight_options
 from backend.src.services.clipper import Clipper
 from backend.src.services.description_builder import build_description
 from backend.src.services.schedule import day_window, slot_time
-from backend.src.services.thumbnailer import Thumbnailer
 
 logger = logging.getLogger(__name__)
 
@@ -51,16 +50,11 @@ class UploadInProgressError(Exception):
 class Uploader:
     def __init__(self, client_factory: Optional[Callable[[], YoutubeClient]] = None,
                  clipper: Optional[Clipper] = None,
-                 thumbnailer: Optional[Thumbnailer] = None,
                  settings_reader: Optional[Callable[[str, Any], Any]] = None,
                  now: Optional[Callable[[], datetime]] = None):
         # Held because publishing a clip means producing the file first, not
         # finding one somebody else left behind.
         self.clipper = clipper or Clipper()
-        # Held for the same reason, and for one more: the still is never sent
-        # to YouTube from here, so the file it writes is the whole point — the
-        # picture the user attaches by hand in YouTube Studio.
-        self.thumbnails = thumbnailer or Thumbnailer()
         self.client_factory = client_factory or YoutubeClient
         self._settings_reader = settings_reader
         # Local time, with its offset attached: the hours a user picks are the
@@ -357,37 +351,8 @@ class Uploader:
             f"Uploader uploaded clip={highlight.generated_clip_filename}, "
             f"video_id={result.get('video_id')}"
         )
-        result["thumbnail_generated"] = self._ensure_thumbnail(project, index)
         self._record_upload(project, index, result)
         return result
-
-    def _ensure_thumbnail(self, project: Project, index: int) -> bool:
-        """Renders this clip's still, if it has not got one already.
-
-        Nothing is sent to YouTube: the API's thumbnail set is accepted and
-        then thrown away when processing finishes, often enough that it is not
-        worth doing at all. The picture is written into the project's
-        `thumbnails/` directory instead, ready for the user to attach in
-        YouTube Studio.
-
-        Only a clip with no picture is rendered. One that has been through the
-        thumbnail editor already says what its owner wanted, and re-rendering
-        it here would only cost an ffmpeg pass to produce the same file.
-
-        Never fatal. The video is live by the time this runs, so a still that
-        will not render must not be reported as a failed upload.
-        """
-        try:
-            path = self.thumbnails.path(project, project.highlights[index])
-            if path is not None and path.exists():
-                return True
-            self.thumbnails.generate(project, index)
-        except Exception as e:
-            logger.warning(f"Published clip {index} but could not make its thumbnail: {e}")
-            return False
-
-        path = self.thumbnails.path(project, project.highlights[index])
-        return path is not None and path.exists()
 
     def verify_publication(
         self, project: Project, index: int, client: Optional[YoutubeClient] = None

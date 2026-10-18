@@ -20,20 +20,6 @@ vi.mock('../../api', async (importOriginal) => {
     })),
     getClipCaptions: vi.fn(async () => ({ enabled: false, style: {}, duration: 0, cues: [] })),
     getActiveProcesses: vi.fn(async () => []),
-    getClipThumbnail: vi.fn(async () => ({
-      settings: {
-        frame_time: 0,
-        show_captions: false,
-        show_overlay: true,
-        extra: null,
-        generated_filename: null,
-        generated_at: null,
-      },
-      title: null,
-      title_font: null,
-      duration: 1,
-      exists: false,
-    })),
   };
 });
 

@@ -11,7 +11,6 @@ import {
   getAspectRatioMap,
   getResolutionMap,
   updateProjectSettings,
-  type ClipPreview,
   type Layout,
   type ProjectMetadata,
 } from '../../api';
@@ -20,7 +19,6 @@ import {
 type ProjectSettings = {
   resolution?: string;
   aspect_ratio?: string;
-  clip_preview?: ClipPreview;
   layout?: Layout;
   stack_darkness?: number;
   split_position?: number;
@@ -50,7 +48,7 @@ interface ProjectSettingsMenuProps {
 
 /**
  * Everything that applies to every clip at once: what the clipper renders at,
- * what it burns in, what the upload says, and what the grid shows at rest.
+ * what it burns in, and what the upload says.
  *
  * In the header with the other project actions rather than on the page. These
  * change the project, not anything you can see — and they are set once and
@@ -61,7 +59,6 @@ export const ProjectSettingsMenu: React.FC<ProjectSettingsMenuProps> = ({ metada
   const queryClient = useQueryClient();
   const resolutionId = useId();
   const aspectRatioId = useId();
-  const clipPreviewId = useId();
   const layoutId = useId();
   const darknessId = useId();
   const splitPositionId = useId();
@@ -124,8 +121,6 @@ export const ProjectSettingsMenu: React.FC<ProjectSettingsMenuProps> = ({ metada
   // string means "keep original" too.
   const currentResolution = pendingSettings.resolution || storedSettings?.resolution || 'keep original';
   const currentAspectRatio = pendingSettings.aspect_ratio || storedSettings?.aspect_ratio || 'keep original';
-  const currentClipPreview: ClipPreview =
-    (pendingSettings.clip_preview ?? storedSettings?.clip_preview) === 'video' ? 'video' : 'thumbnail';
   const pickedLayout = pendingSettings.layout ?? storedSettings?.layout;
   const currentLayout: Layout = pickedLayout && LAYOUTS.includes(pickedLayout) ? pickedLayout : 'crop';
   // `??` rather than `||`: 0 is a darkness, the one that leaves the bands alone.
@@ -247,23 +242,6 @@ export const ProjectSettingsMenu: React.FC<ProjectSettingsMenuProps> = ({ metada
               />
             </span>
           )}
-
-          {/* Not a render setting like the ones above — this one changes nothing
-              about the files. It sits with them because it is the third thing
-              that applies to every clip at once. */}
-          <span className="options-bar__setting">
-            <label htmlFor={clipPreviewId}>Card preview:</label>
-            <select
-              id={clipPreviewId}
-              className="options-bar__select"
-              value={currentClipPreview}
-              aria-describedby={failedSetting === 'card preview' ? errorId : undefined}
-              onChange={(e) => saveSetting('card preview', { clip_preview: e.target.value as ClipPreview })}
-            >
-              <option value="thumbnail">Thumbnail</option>
-              <option value="video">Video frame</option>
-            </select>
-          </span>
         </div>
 
         {/* On its own row rather than beside the three selects: it is about all
@@ -278,9 +256,8 @@ export const ProjectSettingsMenu: React.FC<ProjectSettingsMenuProps> = ({ metada
           needsCurrent={false}
           build={() => ({
             video_defaults: { resolution: currentResolution, aspect_ratio: currentAspectRatio },
-            clip_preview_default: currentClipPreview,
           })}
-          hint="New projects start at this resolution, this aspect ratio and this card preview. Projects that already exist keep their own."
+          hint="New projects start at this resolution and this aspect ratio. Projects that already exist keep their own."
         />
 
         <div className="options-bar__group">

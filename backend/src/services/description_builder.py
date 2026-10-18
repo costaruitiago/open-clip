@@ -78,7 +78,6 @@ _HIGHLIGHT_FIELDS = (
     _DESCRIPTION_FIELD,
     "video_title_for_youtube_short",
     "viral_hook_text",
-    "thumbnail_text",
     "highlight_text",
     "video_description_for_x",
     "video_description_for_reddit",

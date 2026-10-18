@@ -162,7 +162,7 @@ def selected_indices(project: Project) -> Set[int]:
     user wants and the moments below the cutoff together. The ones scoring at
     or above the cutoff are the clips, and only those: the cutoff is the whole
     rule, so a clip under it never appears among them. Steps that work through
-    every clip (cutting, thumbnails, publishing) skip the others; each one can
+    every clip (cutting, publishing) skip the others; each one can
     still be cut or published on its own from its card.
 
     A highlight without a Jev score — every Gemini highlight — is always a clip.

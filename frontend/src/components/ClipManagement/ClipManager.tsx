@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Clip } from './Clip';
 import { ClipSkeleton } from './ClipSkeleton';
-import type { ClipPreview, JevScores } from '../../api';
+import type { JevScores } from '../../api';
 
 interface ClipRaw {
   /** Position in the project's highlights, assigned where the list is built. */
@@ -47,13 +47,11 @@ interface ClipManagerProps {
   sourceUrl: string | null;
   /** Target width / height the clipper would render at, or null for source. */
   aspectRatio: number | null;
-  /** What every still card shows: its thumbnail, or the video frame under it. */
-  clipPreview?: ClipPreview;
   onDeleteClip: (index: number) => void;
   isLoading?: boolean;
 }
 
-const ClipGrid: React.FC<ClipManagerProps> = ({ projectId, clips, belowClips = [], sourceUrl, aspectRatio, clipPreview, onDeleteClip, isLoading }) => {
+const ClipGrid: React.FC<ClipManagerProps> = ({ projectId, clips, belowClips = [], sourceUrl, aspectRatio, onDeleteClip, isLoading }) => {
   const [playingClipIndex, setPlayingClipIndex] = useState<number | null>(null);
   const [showBelow, setShowBelow] = useState(false);
 
@@ -123,7 +121,6 @@ const ClipGrid: React.FC<ClipManagerProps> = ({ projectId, clips, belowClips = [
             enterDelayMs={Math.min(clip.index, 7) * 60}
             sourceUrl={sourceUrl}
             aspectRatio={aspectRatio}
-            clipPreview={clipPreview}
             onDelete={onDeleteClip}
             playingClipIndex={playingClipIndex}
             setPlayingClipIndex={setPlayingClipIndex}
@@ -162,7 +159,6 @@ const ClipGrid: React.FC<ClipManagerProps> = ({ projectId, clips, belowClips = [
                     clip={clip}
                     sourceUrl={sourceUrl}
                     aspectRatio={aspectRatio}
-                    clipPreview={clipPreview}
                     onDelete={onDeleteClip}
                     playingClipIndex={playingClipIndex}
                     setPlayingClipIndex={setPlayingClipIndex}

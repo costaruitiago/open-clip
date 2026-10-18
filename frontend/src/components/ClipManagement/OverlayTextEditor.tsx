@@ -104,9 +104,6 @@ export const OverlayTextEditor: React.FC<OverlayTextEditorProps> = ({
     queryClient.invalidateQueries({ queryKey: ['project', projectId] });
     queryClient.invalidateQueries({ queryKey: ['projectMetadata', projectId] });
     queryClient.invalidateQueries({ queryKey: ['clipCaptions', projectId] });
-    // The still says the same words: a title written here is the first thing
-    // the thumbnail reaches for, so its preview is stale the moment this saves.
-    queryClient.invalidateQueries({ queryKey: ['clipThumbnail', projectId, clipIndex] });
   };
 
   const mutation = useMutation({

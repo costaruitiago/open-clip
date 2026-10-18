@@ -140,11 +140,10 @@ export const ClipTrimmer: React.FC<ClipTrimmerProps> = ({
       updateClipTrim(projectId, clipIndex, next),
     onSuccess: () => {
       // The window travels on the project, and it decides which words fall
-      // inside the clip — so the cues, and the still cut from the same window.
+      // inside the clip — so the cues.
       queryClient.invalidateQueries({ queryKey: ['project', projectId] });
       queryClient.invalidateQueries({ queryKey: ['projectMetadata', projectId] });
       queryClient.invalidateQueries({ queryKey: ['clipCaptions', projectId] });
-      queryClient.invalidateQueries({ queryKey: ['clipThumbnail', projectId, clipIndex] });
     },
   });
 

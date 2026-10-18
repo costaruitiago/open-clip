@@ -7,7 +7,6 @@ import {
   getActiveProcesses,
   getCaptionStyles,
   getClipCaptions,
-  getClipThumbnail,
   regenerateClip,
   importClipToPostiz,
   uploadClip,
@@ -34,31 +33,11 @@ vi.mock('../../api', async (importOriginal) => ({
     status: 'started',
     job: 'test-project-123_postiz_clip_0',
   }),
-  getClipThumbnail: vi.fn().mockResolvedValue({
-    settings: {
-      frame_time: 0,
-      show_captions: false,
-      show_overlay: true,
-      extra: null,
-      generated_filename: null,
-      generated_at: null,
-    },
-    title: null,
-    title_font: null,
-    duration: 2,
-    exists: false,
-  }),
-  updateClipThumbnail: vi.fn().mockResolvedValue({ status: 'success', thumbnail: null }),
-  generateClipThumbnail: vi.fn(),
 }));
 
 const SOURCE_URL = 'http://localhost:8000/projects/static/test-project-123/original.mp4';
 
-const renderClip = (
-  clip: ClipData,
-  aspectRatio: number | null = null,
-  clipPreview: 'thumbnail' | 'video' = 'thumbnail'
-) =>
+const renderClip = (clip: ClipData, aspectRatio: number | null = null) =>
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
@@ -67,7 +46,6 @@ const renderClip = (
           clip={clip}
           sourceUrl={SOURCE_URL}
           aspectRatio={aspectRatio}
-          clipPreview={clipPreview}
           onDelete={() => {}}
           playingClipIndex={null}
           setPlayingClipIndex={() => {}}
@@ -244,125 +222,6 @@ describe('Clip Component', () => {
     expect(upload.disabled).toBe(false);
   });
 
-  // A grid of stills is what these shorts will look like in a feed, which is
-  // the question a review is asking. Nothing is rendered to show it: the
-  // thumbnail is a frame of the clip with text over it, and the card draws
-  // both. The footage is a click — or a project setting — away.
-  describe('what a still card shows', () => {
-    // The text the backend resolved for this thumbnail: the clip's own title,
-    // or the hook the model wrote for it.
-    const title = {
-      enabled: true,
-      text: 'Cold open',
-      start: 0,
-      duration: 3,
-      fade_in: 0,
-      fade_out: 0.6,
-      font_family: 'Arial Black',
-      font_size_pct: 8,
-      bold: true,
-      italic: false,
-      uppercase: true,
-      text_color: '#FFFFFF',
-      outline_color: '#000000',
-      outline_pct: 0.6,
-      shadow_color: '#000000',
-      shadow_pct: 0.8,
-      highlight_color: '#FFE000',
-      box_color: null,
-      position_pct: 12,
-      max_width_pct: 86,
-    };
-
-    beforeEach(() => {
-      stubFrameSize(400);
-      // Counted per test: the assertion below is that a project showing the
-      // footage never asks for a thumbnail at all.
-      vi.mocked(getClipThumbnail).mockClear();
-      vi.mocked(getClipThumbnail).mockResolvedValue({
-        settings: {
-          frame_time: 2,
-          show_captions: false,
-          show_overlay: true,
-          extra: null,
-          generated_filename: null,
-          generated_at: null,
-        },
-        title,
-        title_font: { family: 'Arial Black', height_ratio: 1.2, url: null },
-        duration: 4,
-        exists: false,
-      });
-    });
-
-    it('draws the thumbnail over the clip before it is played', async () => {
-      renderClip(previewClip);
-
-      expect(await screen.findByText('Cold open')).toBeDefined();
-    });
-
-    it('shows none of the subtitles a rendered clip has burned into it', async () => {
-      vi.mocked(getClipThumbnail).mockResolvedValue({
-        settings: {
-          frame_time: 0,
-          show_captions: false,
-          show_overlay: true,
-          extra: null,
-          generated_filename: null,
-          generated_at: null,
-        },
-        title,
-        title_font: { family: 'Arial Black', height_ratio: 1.2, url: null },
-        duration: 4,
-        exists: false,
-      });
-
-      renderClip({ ...renderedClip, captionsBurned: true, overlayBurned: true });
-      await screen.findByText('Cold open');
-
-      // The still covers the clip's own picture rather than being drawn onto
-      // it, so what the file carries in its pixels does not reach the card.
-      const still = Array.from(document.querySelectorAll('video')).find((video) => video.muted);
-      expect(still?.getAttribute('src')).toBe(SOURCE_URL);
-      // And the title is drawn once, by us — not once by us and once in the
-      // burned frame underneath.
-      expect(screen.getAllByText('Cold open').length).toBe(1);
-    });
-
-    it('takes its frame from the source, at the moment the thumbnail is cut from', async () => {
-      renderClip(renderedClip);
-      await screen.findByText('Cold open');
-
-      // Never the cut file: the thumbnail is a frame of the original under the
-      // clipper's crop, so a rendered clip's burned subtitles and burned title
-      // are not in it — and must not be shown as if they were.
-      const still = Array.from(document.querySelectorAll('video')).find((video) => video.muted);
-      expect(still?.getAttribute('src')).toBe(SOURCE_URL);
-      // The clip starts at 1s in the source and the thumbnail is 2s into the
-      // clip.
-      expect(still?.currentTime).toBe(3);
-    });
-
-    it('shows the footage when the project asks for it instead', async () => {
-      renderClip(previewClip, null, 'video');
-
-      await waitFor(() => expect(getClipCaptions).toHaveBeenCalled());
-      expect(screen.queryByText('Cold open')).toBeNull();
-      // Nothing to ask about, either: the card is not drawing a thumbnail.
-      expect(getClipThumbnail).not.toHaveBeenCalled();
-    });
-
-    it('gets out of the way once the clip is scrubbed', async () => {
-      renderClip(previewClip);
-      await screen.findByText('Cold open');
-
-      // A frame the user went looking for is not answered by covering it up.
-      fireEvent.change(screen.getByLabelText(/Position within/i), { target: { value: '30' } });
-
-      expect(screen.queryByText('Cold open')).toBeNull();
-    });
-  });
-
   // A card is where clips are actually worked on, so everything the detail
   // page offers for one clip is reachable from it — including the guard on the
   // one action that leaves the app.
@@ -398,19 +257,6 @@ describe('Clip Component', () => {
       // button's own warning is what is left.
       expect(screen.queryByRole('link', { name: /View on YouTube/ })).toBeNull();
       expect(screen.queryByText('Published')).toBeNull();
-    });
-
-    it('opens the thumbnail editor on the frame the clip starts at', async () => {
-      renderClip(renderedClip);
-
-      fireEvent.click(screen.getByLabelText("Edit this clip's thumbnail"));
-
-      await waitFor(() => expect(getClipThumbnail).toHaveBeenCalledWith('test-project-123', 0));
-      expect(screen.getByRole('dialog')).toHaveTextContent(/Thumbnail for clip 1/);
-      // Picked out of the source, which is where the frame is actually taken
-      // from — the cut file is not what the thumbnail is made of.
-      const players = Array.from(document.querySelectorAll('video'));
-      expect(players.some((video) => video.getAttribute('src') === SOURCE_URL)).toBe(true);
     });
   });
 
@@ -594,7 +440,7 @@ describe('Clip Component', () => {
     // A layout or ratio change leaves the burned file stale, and the card falls
     // back to the source, which has no captions in it to stand in for the overlay.
     it('draws the captions over the source preview of a stale cut that had them burned', async () => {
-      renderClip({ ...renderedClip, captionsBurned: true, outputStale: true }, 9 / 16, 'video');
+      renderClip({ ...renderedClip, captionsBurned: true, outputStale: true }, 9 / 16);
 
       expect(document.querySelector('video')?.getAttribute('src')).toBe(SOURCE_URL);
       await waitFor(() => expect(screen.getByText('lost')).toBeDefined());

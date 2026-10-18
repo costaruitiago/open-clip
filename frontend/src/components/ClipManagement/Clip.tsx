@@ -6,18 +6,14 @@ import { Button } from '../Button';
 import {
   getClipVideoUrl,
   getClipCaptions,
-  getClipThumbnail,
-  type ClipPreview,
   type JevScores,
 } from '../../api';
 import { JevScoreBadge, JevTags } from './JevScoreBadge';
-import { ThumbnailPreview } from './ThumbnailPreview';
 import { Tooltip } from '../Tooltip';
 import { CaptionOverlay } from './CaptionOverlay';
 import { ClipPlayer } from './ClipPlayer';
 import { TextOverlay } from './TextOverlay';
 import { OverlayTextEditor } from './OverlayTextEditor';
-import { ThumbnailEditor } from './ThumbnailEditor';
 import { ClipTrimmer } from './ClipTrimmer';
 import { useInViewport } from '../../hooks/useInViewport';
 import { describeRequestFailure, useClipRender } from '../../hooks/useClipRender';
@@ -108,13 +104,6 @@ interface ClipProps {
   sourceUrl: string | null;
   /** Target width / height the clipper would render at, or null for source. */
   aspectRatio: number | null;
-  /**
-   * What every card in this project shows while it is still: the clip's
-   * thumbnail, or the video frame under it. A project setting rather than a
-   * card one — a grid where some cards show stills and others show footage is
-   * not a comparison of anything.
-   */
-  clipPreview?: ClipPreview;
   onDelete: (index: number) => void;
   playingClipIndex: number | null;
   setPlayingClipIndex: (index: number | null) => void;
@@ -167,7 +156,7 @@ const postizButtonState = (clip: ClipData) => {
   };
 };
 
-const ClipCard: React.FC<ClipProps> = ({ projectId, clip, sourceUrl, aspectRatio, clipPreview = 'thumbnail', onDelete, playingClipIndex, setPlayingClipIndex, enterDelayMs = 0 }) => {
+const ClipCard: React.FC<ClipProps> = ({ projectId, clip, sourceUrl, aspectRatio, onDelete, playingClipIndex, setPlayingClipIndex, enterDelayMs = 0 }) => {
   const [isConfirming, setIsConfirming] = useState(false);
   // Publishing is irreversible from here, so it is guarded on the card exactly
   // as it is on the detail page. The grid is the faster place to click, which
@@ -175,7 +164,6 @@ const ClipCard: React.FC<ClipProps> = ({ projectId, clip, sourceUrl, aspectRatio
   const [isConfirmingUpload, setIsConfirmingUpload] = useState(false);
   const [isEditingCaptions, setIsEditingCaptions] = useState(false);
   const [isEditingOverlay, setIsEditingOverlay] = useState(false);
-  const [isEditingThumbnail, setIsEditingThumbnail] = useState(false);
   const [isTrimming, setIsTrimming] = useState(false);
   // What the overlay editor is typing, held here so the card's own picture
   // redraws per keystroke rather than waiting for the save to come back.
@@ -206,17 +194,11 @@ const ClipCard: React.FC<ClipProps> = ({ projectId, clip, sourceUrl, aspectRatio
   const videoSrc = isRendered
     ? getClipVideoUrl(projectId, clip.filename as string, clip.renderedAt)
     : null;
-  // What the card shows before it is played: this clip's thumbnail, drawn
-  // rather than fetched. The picture itself is not made until the clip is
-  // published, and there is nothing in it the page cannot draw — a frame of
-  // the clip with text over it, which is what the player is already doing.
-  const wantsThumbnail = clipPreview === 'thumbnail';
   // Also while the caption dialog is open: it plays this same clip behind a
   // scrim, and two copies of one clip playing over each other is two soundtracks.
   const shouldPause =
     isEditingCaptions ||
     isEditingOverlay ||
-    isEditingThumbnail ||
     isTrimming ||
     (playingClipIndex !== null && playingClipIndex !== clip.index);
   const [mediaRef, hasApproached] = useInViewport<HTMLDivElement>();
@@ -247,19 +229,6 @@ const ClipCard: React.FC<ClipProps> = ({ projectId, clip, sourceUrl, aspectRatio
   // source has no captions in it.
   const overlayCues =
     captions && captions.cues.length > 0 && (!playsRendered || !clip.captionsBurned) ? captions : null;
-
-  // Which frame the thumbnail is, and what it says. Asked for only when the
-  // project shows thumbnails, and only once the card is worth drawing at all.
-  const { data: thumbnail } = useQuery({
-    queryKey: ['clipThumbnail', projectId, clip.index],
-    queryFn: () => getClipThumbnail(projectId, clip.index),
-    enabled: hasApproached && wantsThumbnail,
-    staleTime: 5 * 60_000,
-  });
-  // Drawn only when there is a source to take the frame out of: the still is
-  // cut from the original video, not from this clip's file, so a project whose
-  // source has gone cannot show one.
-  const thumbnailWhileStill = wantsThumbnail && !!thumbnail && !!sourceUrl;
 
   // The title as it stands: what is being typed, or what the clip resolves to
   // — its own if it has unlocked one, otherwise the project's — or the values a
@@ -312,23 +281,6 @@ const ClipCard: React.FC<ClipProps> = ({ projectId, clip, sourceUrl, aspectRatio
         label: cardLabel,
       }
     : null;
-
-  // The thumbnail is cut from the *source* — the clipper's own crop applied to
-  // one frame of it — so the source window is the honest thing to pick a frame
-  // out of, whatever the rendered file happens to carry. The cut file only
-  // stands in for a project whose source has gone.
-  const thumbnailPreview: CaptionPreviewSource | null = sourceUrl
-    ? {
-        src: sourceUrl,
-        start: clip.original_start,
-        end: clip.original_end,
-        isPreview: true,
-        aspectRatio,
-        label: cardLabel,
-      }
-    : videoSrc
-      ? { src: videoSrc, start: 0, end: null, isPreview: false, aspectRatio, label: cardLabel }
-      : null;
 
   // A trim moves the highlight and touches no file, so a cut clip can be
   // playing footage the timecodes above it no longer describe. Both stamps are
@@ -472,25 +424,8 @@ const ClipCard: React.FC<ClipProps> = ({ projectId, clip, sourceUrl, aspectRatio
             shouldPause={shouldPause}
             cues={captions?.cues}
             renderOverlay={
-              overlayCues || showTitle || thumbnailWhileStill
+              overlayCues || showTitle
                 ? (position, isPlaying) => {
-                    // Untouched at the top of the clip: the card is standing in
-                    // for the thumbnail, so it shows the thumbnail — its own
-                    // frame of the source, over the player entirely. Playing
-                    // it, or scrubbing anywhere, is asking for the video.
-                    if (thumbnailWhileStill && !isPlaying && position < 0.05) {
-                      return (
-                        <ThumbnailPreview
-                          src={sourceUrl as string}
-                          sourceTime={clip.original_start + thumbnail!.settings.frame_time}
-                          aspectRatio={aspectRatio}
-                          settings={thumbnail!.settings}
-                          title={thumbnail!.title}
-                          font={thumbnail!.title_font}
-                          captions={captions}
-                        />
-                      );
-                    }
                     return (
                       <>
                         {overlayCues && (
@@ -845,32 +780,6 @@ const ClipCard: React.FC<ClipProps> = ({ projectId, clip, sourceUrl, aspectRatio
           </Button>
         </Tooltip>
 
-        <Tooltip text="Edit thumbnail">
-          <Button
-            variant="ghost"
-            onClick={() => setIsEditingThumbnail(true)}
-            aria-label="Edit this clip's thumbnail"
-            style={{
-              padding: 'var(--space-sm)',
-              minWidth: '44px',
-              minHeight: '44px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--text)',
-            }}
-          >
-            {/* A framed picture: the still that stands for the clip. No accent
-                state, unlike the lock and the title beside it — every rendered
-                clip has a thumbnail, so having one is not the exception. */}
-            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="4" width="18" height="16" rx="1" />
-              <path d="M3 16l5-5 4 4 3-3 6 6" />
-              <circle cx="9" cy="9" r="1.2" />
-            </svg>
-          </Button>
-        </Tooltip>
-
         <Tooltip text="View Details">
           <Button 
             variant="ghost"
@@ -1009,17 +918,6 @@ const ClipCard: React.FC<ClipProps> = ({ projectId, clip, sourceUrl, aspectRatio
         // dialog carries its own picture rather than drawing onto the card.
         preview={overlayPreview}
         font={captions?.overlay_font}
-      />
-
-      <ThumbnailEditor
-        projectId={projectId}
-        clipIndex={clip.index}
-        isOpen={isEditingThumbnail}
-        onClose={() => setIsEditingThumbnail(false)}
-        // Its own picture, like the other two dialogs: the card may be
-        // scrolled anywhere, and picking a frame means scrubbing one.
-        preview={thumbnailPreview}
-        captions={captions}
       />
 
       <ClipTrimmer

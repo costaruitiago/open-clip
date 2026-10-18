@@ -43,8 +43,7 @@ await mkdir(OUT_DIR, { recursive: true });
 
 async function go(path) {
   await page.goto(BASE_URL + path, { waitUntil: 'networkidle' });
-  // The players draw their first frame — and the thumbnail over it — after the
-  // metadata loads, which is after `networkidle` says the page is done.
+  // The players draw their first frame after the metadata loads, which is after `networkidle` says the page is done.
   await page.waitForTimeout(1500);
 }
 
@@ -167,16 +166,9 @@ await page.getByRole('button', { name: 'Add overlay text' }).first().click();
 await page.waitForTimeout(1200);
 await shot('overlay_text', { locator: page.getByRole('dialog') });
 await page.keyboard.press('Escape');
-await page.waitForTimeout(500);
-
-// 9. Thumbnail — which frame, and what is written on it.
-await page.getByRole('button', { name: 'Edit thumbnail' }).first().click();
-await page.waitForTimeout(1200);
-await shot('thumbnail_editor', { locator: page.getByRole('dialog') });
-await page.keyboard.press('Escape');
 await page.setViewportSize({ width: WIDTH, height: 900 });
 
-// 10. Settings. The OAuth client is covered before the shutter: a real one
+// 9. Settings. The OAuth client is covered before the shutter: a real one
 //     lives in that box on a configured machine.
 await go('/settings');
 // A stored client is reported as invalid for the first moment after the page

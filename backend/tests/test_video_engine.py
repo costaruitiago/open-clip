@@ -321,20 +321,6 @@ def test_stacked_process_clip_produces_requested_dimensions(engine, sample_video
     assert probe_video(str(output))[:2] == (606, 1080)
 
 
-@requires_ffmpeg
-def test_stacked_extract_frame_darkens_only_the_bands(engine, sample_video, tmp_path, monkeypatch):
-    monkeypatch.setattr(engine, "get_subject_center", lambda *a, **k: None, raising=False)
-    output = tmp_path / "still.png"
-
-    engine.extract_frame(sample_video, str(output), 1.0, "9:16", "keep original",
-                         layout="stacked", stack_darkness=80)
-
-    frame = cv2.imread(str(output), cv2.IMREAD_GRAYSCALE)
-    height = frame.shape[0]
-    top, middle = frame[: height // 5].mean(), frame[2 * height // 5: 3 * height // 5].mean()
-    assert middle > top * 2
-
-
 def split_graph(**kwargs):
     args = build_picture_args(1920, 1080, 1080, 1920, layout="split", **kwargs)
     assert args[2:] == ["-map", "[v]"]

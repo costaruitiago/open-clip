@@ -1139,8 +1139,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
           <label style={{ fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.9rem' }}>Overlay titles on new projects:</label>
           <span style={{ fontSize: '0.9rem' }}>
             {overlayDefaults
-              ? `${overlayDefaults.enabled ? 'Burned into clips' : 'Thumbnails only'} · ${overlayDefaults.font_family ?? 'default font'} · ${overlayDefaults.font_size_pct ?? '—'}% of frame · ${overlayDefaults.position_pct ?? '—'}% from top`
-              : 'Not set — new projects start with titles off, drawn on the thumbnails only.'}
+              ? `${overlayDefaults.enabled ? 'Burned into clips' : 'Off'} · ${overlayDefaults.font_family ?? 'default font'} · ${overlayDefaults.font_size_pct ?? '—'}% of frame · ${overlayDefaults.position_pct ?? '—'}% from top`
+              : 'Not set — new projects start with titles off.'}
           </span>
           <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>
             Set this from a project: open <strong>Overlay titles</strong> in its settings, style it
@@ -1157,24 +1157,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
                 </button>
               </>
             )}
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
-          <label htmlFor="clip-preview-default" style={{ fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.9rem' }}>Card preview on new projects:</label>
-          <select
-            id="clip-preview-default"
-            value={settings.clip_preview_default === 'video' ? 'video' : 'thumbnail'}
-            onChange={(e) => updateMutation.mutate({
-              settings: { clip_preview_default: e.target.value },
-            })}
-            style={inputStyle}
-          >
-            <option value="thumbnail">Thumbnail</option>
-            <option value="video">Video frame</option>
-          </select>
-          <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>
-            What a clip card shows while it sits still. Each project can change its own.
           </span>
         </div>
 

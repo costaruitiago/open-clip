@@ -9,7 +9,6 @@ import {
   getExecutionStatus,
   getSourceVideoUrl,
   syncPostiz,
-  type ClipPreview,
   type Highlight,
   type ProjectMetadata,
   type StepActivity,
@@ -133,13 +132,6 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ metadata, pipeline
 
   const highlightCount = displayMetadata.highlights?.length ?? 0;
   const hasHighlights = highlightCount > 0;
-
-  // What a clip shows while it sits still, for every clip in this project: its
-  // thumbnail, or the video frame under it. Read from the project rather than
-  // held here — the control that changes it is in the header now, and this
-  // follows the saved value.
-  const currentClipPreview: ClipPreview =
-    metadata.settings?.clip_preview === 'video' ? 'video' : 'thumbnail';
 
   // Every highlight is a card from the moment the highlights step finishes;
   // the clipper only swaps a preview for a rendered file.
@@ -311,7 +303,6 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ metadata, pipeline
             belowClips={belowClips}
             sourceUrl={sourceUrl}
             aspectRatio={previewAspectRatio}
-            clipPreview={currentClipPreview}
             onDeleteClip={onDeleteClip}
             isLoading={isClipperRunning}
           />

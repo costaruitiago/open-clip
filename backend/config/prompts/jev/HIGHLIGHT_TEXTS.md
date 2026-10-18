@@ -12,16 +12,6 @@ YOUTUBE DESCRIPTION RULES (`video_description_for_youtube_short`)
 - Do NOT write links, URLs, hashtags, credits, calls to action, or any sentence referencing the original video or podcast. Those are added afterwards from a template the user controls, and repeating them here duplicates them.
 - Do not open with "In this short" or "This clip". Lead with the idea.
 
-THUMBNAIL TEXT RULES (`thumbnail_text`)
-- This is the text burned onto the still image that stands for the short in a feed. It is not the hook and not the title: it is the two or three words that stop a thumb.
-- It is read at roughly 120 pixels wide on a phone. Write for that size: no context, no setup, no pronoun pointing at something off-screen ("this", "that", "he"), nothing that needs the first sentence of the video to make sense.
-- 2 to 4 words. Never more than 5. Under 20 characters in total is ideal.
-- Not a sentence. A fragment, a claim, a number, a contradiction. No full stops, no quotation marks, no hashtags, no emoji.
-- Wrap exactly ONE word in asterisks, `*like this*`. That word is drawn in a second colour and is where the eye lands, so mark the word carrying the tension — a verb, a number or a noun, never an article, preposition or auxiliary.
-- No single word longer than 10 characters. The renderer wraps between words but cannot break inside one: a longer word is cut off at the frame edge.
-- Do not repeat `viral_hook_text` word for word. The hook is a line of speech laid over the opening seconds; this is a poster.
-- Write it in normal case. Capitalisation is applied when it is drawn.
-
 SOURCE VIDEO (context only — never quote these back in any field)
 - Original video title: {source_title}
 
@@ -34,7 +24,6 @@ No markdown, no code fences, no explanations, no extra keys, no commentary befor
     {{
       "index": 0,
       "viral_hook_text": "max 8 words, punchy overlay",
-      "thumbnail_text": "2-4 words for the thumbnail, exactly one *marked*",
       "video_title_for_youtube_short": "max 90 characters, curiosity-driven",
       "video_description_for_youtube_short": "2-4 sentences, no links, no hashtags, no reference to the original video",
       "video_description_for_x": "1-2 sentences, engagement-focused",

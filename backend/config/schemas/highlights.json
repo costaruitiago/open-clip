@@ -10,7 +10,6 @@
           "start": {"type": "number"},
           "end": {"type": "number"},
           "viral_hook_text": {"type": "string"},
-          "thumbnail_text": {"type": "string"},
           "video_description_for_x": {"type": "string"},
           "video_description_for_reddit": {"type": "string"},
           "video_description_for_linkedin": {"type": "string"},

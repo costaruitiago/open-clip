@@ -52,45 +52,9 @@ class FakeClipper:
         return highlights[index].to_dict()
 
 
-class FakeThumbnailer:
-    """Stands in for the still an upload leaves behind.
-
-    Nothing here goes to YouTube — the picture is written for the user to
-    attach by hand — so what a test asks is whether the file exists and whether
-    it was rendered again over one that was already there.
-    """
-
-    def __init__(self, project_dir: Path, error: Exception = None, rendered: bool = False):
-        self.calls = []
-        self.error = error
-        self.project_dir = project_dir
-        self.filename = None
-        if rendered:
-            self.filename = "clip_000.jpg"
-            self._write(self.filename, b"the still the user made")
-
-    def _write(self, filename: str, content: bytes) -> Path:
-        path = self.project_dir / "thumbnails" / filename
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(content)
-        return path
-
-    def path(self, project, highlight):
-        if not self.filename:
-            return None
-        return self.project_dir / "thumbnails" / self.filename
-
-    def generate(self, project, index):
-        self.calls.append(index)
-        if self.error:
-            raise self.error
-        self.filename = f"clip_{index:03d}.jpg"
-        self._write(self.filename, b"the still this upload made")
-
-
 def uploader(project_dir: Path, **overrides) -> Uploader:
     """An uploader whose cut is a fake, which is every test that publishes."""
-    options = {"clipper": FakeClipper(project_dir), "thumbnailer": FakeThumbnailer(project_dir)}
+    options = {"clipper": FakeClipper(project_dir)}
     options.update(overrides)
     return Uploader(**options)
 
@@ -863,64 +827,3 @@ def test_a_video_that_is_gone_takes_its_schedule_with_it(project_root):
     stored = read_metadata()["highlights"][0]
     assert stored["youtube_privacy"] is None
     assert stored["youtube_publish_at"] is None
-
-
-class TestThumbnail:
-    """The still is made on publish and stays on disk: nothing is sent to YouTube.
-
-    Setting a thumbnail through the API was removed — YouTube overwrites it
-    when processing finishes, often enough to be worthless — so what the
-    upload owes the user is the file, ready to attach in YouTube Studio.
-    """
-
-    def test_a_clip_with_no_still_gets_one_made_when_it_is_published(self, project_root):
-        project_dir = write_project(project_root, [highlight()])
-        thumbnails = FakeThumbnailer(project_dir)
-
-        result = uploader(project_dir, thumbnailer=thumbnails).upload_one(
-            Project(PROJECT_ID), 0, client=FakeYoutube()
-        )
-
-        assert thumbnails.calls == [0]
-        assert result["thumbnail_generated"] is True
-        assert (project_dir / "thumbnails" / "clip_000.jpg").exists()
-
-    def test_a_still_the_user_already_made_is_left_alone(self, project_root):
-        # A clip that has been through the thumbnail editor says what its owner
-        # wanted. Re-rendering it here would spend an ffmpeg pass to replace it.
-        project_dir = write_project(project_root, [highlight()])
-        thumbnails = FakeThumbnailer(project_dir, rendered=True)
-
-        result = uploader(project_dir, thumbnailer=thumbnails).upload_one(
-            Project(PROJECT_ID), 0, client=FakeYoutube()
-        )
-
-        assert thumbnails.calls == []
-        assert result["thumbnail_generated"] is True
-        assert (project_dir / "thumbnails" / "clip_000.jpg").read_bytes() == b"the still the user made"
-
-    def test_the_video_is_never_told_about_the_picture(self, project_root):
-        project_dir = write_project(project_root, [highlight()])
-        client = FakeYoutube()
-
-        uploader(project_dir).upload_one(Project(PROJECT_ID), 0, client=client)
-
-        # The handle has one method a thumbnail could go through, and it is not
-        # there any more; this is cover against it coming back.
-        assert not hasattr(client, "set_thumbnail")
-
-    def test_a_still_that_will_not_render_does_not_fail_the_upload(self, project_root):
-        # The video is live by the time this runs. A picture that could not be
-        # made is a missing picture, not a failed publish.
-        project_dir = write_project(project_root, [highlight()])
-        thumbnails = FakeThumbnailer(project_dir, error=RuntimeError("ffmpeg fell over"))
-        client = FakeYoutube()
-
-        result = uploader(project_dir, thumbnailer=thumbnails).upload_one(
-            Project(PROJECT_ID), 0, client=client
-        )
-
-        assert result["thumbnail_generated"] is False
-        assert result["video_id"] == "vid-1"
-        assert client.calls  # the video went up all the same
-        assert read_metadata()["highlights"][0]["youtube_video_id"] == "vid-1"

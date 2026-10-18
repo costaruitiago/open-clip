@@ -39,12 +39,9 @@ from google.oauth2.credentials import Credentials
 
 logger = logging.getLogger(__name__)
 
-# Upload publishes the video and attaches its thumbnail. Readonly is what lets
-# the uploader ask whether YouTube has finished processing a video: a thumbnail
-# set while it is still processing is accepted and then overwritten by the one
-# YouTube generates, so the set has to wait for an answer only this scope can
-# get. A token authorised before this scope was added still uploads; it just
-# cannot be told when to attach the picture, and falls back to guessing.
+# Upload publishes the video. Readonly is what lets the uploader ask YouTube
+# about a video it published. A token authorised before this scope was added
+# still uploads.
 #
 # force-ssl is what lets an upload replace a clip's video: the new cut goes up
 # and the old video is deleted, which neither of the other two allows.
@@ -150,8 +147,7 @@ def token_status(token_path: Path = DEFAULT_TOKEN_PATH) -> Dict[str, Any]:
         "has_refresh_token": bool(creds.refresh_token),
         "account": getattr(creds, "account", None) or None,
         # Not a reason to reconnect on its own — uploads work without it — but
-        # it is why a thumbnail may not stick, and the user is the only one who
-        # can grant it.
+        # the user is the only one who can grant it.
         "missing_scopes": sorted(set(SCOPES) - granted),
     }
 

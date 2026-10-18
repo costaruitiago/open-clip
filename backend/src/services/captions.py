@@ -92,8 +92,7 @@ class CaptionService:
         A highlight carrying its own `overlay` has unlocked and speaks for
         itself; one carrying None defers to the project's configuration, which
         holds no text, so it draws nothing over the video until a line is
-        written for it. The thumbnail is the exception: it has the model's line
-        to fall back on, and draws it in exactly this configuration.
+        written for it.
         """
         own = getattr(highlight, "overlay", None) if highlight is not None else None
         if own is not None:

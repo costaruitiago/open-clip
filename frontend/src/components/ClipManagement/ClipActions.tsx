@@ -70,8 +70,6 @@ interface ClipActionsProps {
   onEditOverlay: () => void;
   /** True once this clip has a title, so the button can say which it does. */
   hasOverlay?: boolean;
-  /** Opens the thumbnail editor: which frame stands for the clip, and what is written on it. */
-  onEditThumbnail: () => void;
   /** Opens the trimmer: where in the source this clip starts and ends. */
   onTrim?: () => void;
   /**
@@ -100,15 +98,13 @@ export const ClipActions: React.FC<ClipActionsProps> = ({
   postizChannels = [],
   onEditOverlay,
   hasOverlay = false,
-  onEditThumbnail,
   onTrim,
   needsRecut = false,
 }) => {
   const queryClient = useQueryClient();
 
   // Nothing tells this application when a video it published is deleted, so
-  // the record outlives the video — a dead link here, and a thumbnail button
-  // pointed at nothing. The server checks with YouTube and clears the record
+  // the record outlives the video — a dead link here. The server checks with YouTube and clears the record
   // if it has gone, so asking is also the fix; the project is refetched to
   // pick the correction up.
   const { data: publication } = useQuery({
@@ -360,11 +356,6 @@ export const ClipActions: React.FC<ClipActionsProps> = ({
           the feature being broken. */}
       <Button variant="ghost" size="sm" style={rowStyle} onClick={onEditOverlay}>
         {hasOverlay ? 'Edit overlay text' : 'Add overlay text'}
-      </Button>
-      {/* Not "Add": every rendered clip already has a thumbnail — the first
-          frame with its title on it. This is where that choice is changed. */}
-      <Button variant="ghost" size="sm" style={rowStyle} onClick={onEditThumbnail}>
-        Edit thumbnail
       </Button>
       {onTrim && (
         // Accent when the file has fallen behind the window, the same mark the

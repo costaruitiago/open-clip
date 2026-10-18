@@ -159,8 +159,7 @@ class TestOverlayRendering:
 
     def test_a_title_nobody_configured_still_has_one(self):
         # The lift is the default rather than an option: it is what separates
-        # the words from the picture, and on a thumbnail — one frame, no fade,
-        # no movement — it is the only lift there is.
+        # the words from the picture.
         line = build_overlay_style_line(OverlayText.from_dict(titled()), 1080, 1920)
         assert float(line.split(",")[17]) > 0
 

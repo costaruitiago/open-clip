@@ -200,16 +200,6 @@ class VideoEngine(ABC):
     ) -> None:
         pass
 
-    @abstractmethod
-    def extract_frame(
-        self, input_path: str, output_path: str, timestamp: float,
-        aspect_ratio: str, resolution: str, subtitle_path: Optional[str] = None,
-        framing_timestamp: Optional[float] = None,
-        layout: str = "crop", stack_darkness: int = 50,
-        split_position: int = 50, split_swap: bool = False, split_divider: bool = False,
-    ) -> None:
-        pass
-
 class OpenCVVideoEngine(VideoEngine):
     def __init__(self, model_path: str):
         from ultralytics import YOLO
@@ -302,59 +292,6 @@ class OpenCVVideoEngine(VideoEngine):
             '-movflags', '+faststart',
             output_path,
         ]
-
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            logger.error(f"ffmpeg failed for {output_path}: {result.stderr.strip()}")
-            raise subprocess.CalledProcessError(result.returncode, cmd, stderr=result.stderr)
-
-    def extract_frame(
-        self, input_path: str, output_path: str, timestamp: float,
-        aspect_ratio: str, resolution: str, subtitle_path: Optional[str] = None,
-        framing_timestamp: Optional[float] = None,
-        layout: str = "crop", stack_darkness: int = 50,
-        split_position: int = 50, split_swap: bool = False, split_divider: bool = False,
-    ) -> None:
-        """Writes one frame of the source as an image, framed like the clip.
-
-        The crop and scale are the ones `process_clip` would apply, so a still
-        taken from inside a clip's window is the same picture the clip shows at
-        that moment rather than a differently-framed one.
-
-        `framing_timestamp` is the moment the crop is centred on. It defaults to
-        the frame being taken, but a thumbnail for a clip passes the clip's
-        start: the clip is cropped once, around whoever is on screen when it
-        begins, and a still that re-centres itself would not match it.
-
-        `subtitle_path` is burned at time zero, because seeking with `-ss`
-        before the input rebases the output timestamps — which is why a
-        thumbnail's subtitle file is written frozen (`render_still_ass`) rather
-        than reusing the clip's.
-        """
-        src_w, src_h, _ = probe_video(input_path)
-        target_w, target_h = self._resolve_target_dimensions(src_w, src_h, aspect_ratio, resolution)
-
-        framing = timestamp if framing_timestamp is None else framing_timestamp
-        subj_x, subj_y = self.get_subject_center(input_path, framing) or (0.5, 0.5)
-        picture = build_picture_args(
-            src_w, src_h, target_w, target_h, subj_x, subj_y,
-            layout=layout, stack_darkness=stack_darkness, split_position=split_position,
-            split_swap=split_swap, split_divider=split_divider, subtitle_path=subtitle_path,
-        )
-
-        logger.info(f"Extracting frame at {timestamp}s from {input_path} to {output_path}")
-
-        cmd = [
-            'ffmpeg', '-y', '-nostdin', '-loglevel', 'error',
-            '-ss', str(max(0.0, timestamp)),
-            '-i', input_path,
-            *picture,
-            '-frames:v', '1',
-        ]
-        # 2 is the best JPEG quality ffmpeg will give without going lossless.
-        # YouTube caps a thumbnail at 2MB, which a 1080x1920 frame stays well
-        # under at this setting.
-        cmd += ['-q:v', '2', output_path]
 
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:

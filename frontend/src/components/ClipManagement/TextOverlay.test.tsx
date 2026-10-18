@@ -77,8 +77,7 @@ describe('TextOverlay', () => {
     expect(block()).toHaveStyle({ fontSize: '32px' });
   });
 
-  // The lift the burn draws with ASS `Shadow`, and the only one a thumbnail —
-  // one frame, no fade — can carry.
+  // The lift the burn draws with ASS `Shadow`.
   it('offsets a hard shadow by a percentage of the frame', () => {
     render(<TextOverlay overlay={{ ...TITLE, shadow_pct: 1, shadow_color: '#000000' }} time={0} still />);
     // 1% of the 400px frame, down and right, with no blur radius.

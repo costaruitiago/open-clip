@@ -12,7 +12,7 @@ export const displayScore = (scores: JevScores | null | undefined): number | und
  * Which highlights are this project's clips, by position.
  *
  * Mirrors `selected_indices` in backend/src/services/highlight_options.py,
- * which decides what the cut, thumbnail and publish steps work through. A Jev
+ * which decides what the cut and publish steps work through. A Jev
  * run keeps every moment it scored; the ones at or above the cutoff are the
  * clips, and only those. A highlight without a Jev score (every Gemini one) is
  * always a clip.
