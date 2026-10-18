@@ -8,7 +8,9 @@ import {
   getClipCaptions,
   getClipThumbnail,
   type ClipPreview,
+  type JevScores,
 } from '../../api';
+import { JevScoreBadge, JevTags } from './JevScoreBadge';
 import { ThumbnailPreview } from './ThumbnailPreview';
 import { Tooltip } from '../Tooltip';
 import { CaptionOverlay } from './CaptionOverlay';
@@ -17,7 +19,6 @@ import { TextOverlay } from './TextOverlay';
 import { OverlayTextEditor } from './OverlayTextEditor';
 import { ThumbnailEditor } from './ThumbnailEditor';
 import { ClipTrimmer } from './ClipTrimmer';
-import { formatTimecode } from '../../utils/aspectRatio';
 import { useInViewport } from '../../hooks/useInViewport';
 import { describeRequestFailure, useClipRender } from '../../hooks/useClipRender';
 import { useClipUpload } from '../../hooks/useClipUpload';
@@ -92,6 +93,8 @@ export interface ClipData {
    * looked exactly like one that had never been filed.
    */
   postizState?: string | null;
+  /** What Jev answered about this clip, or absent for a clip Gemini picked. */
+  jevScores?: JevScores | null;
   original_start: number;
   original_end: number;
   text: string;
@@ -435,45 +438,15 @@ const ClipCard: React.FC<ClipProps> = ({ projectId, clip, sourceUrl, aspectRatio
             : undefined
         }
       >
-        {/* State and timecode, over the picture. They had a row each of their
-            own above the player, which on a grid of a dozen cards was a dozen
-            rows of chrome for two facts that fit in a corner. */}
-        <div className="clip-card__overlay">
-          {/* Only the preview state is worth a pill. "Rendered" restated what
-              the card already shows — a cut file playing from its own start.
-              A clip whose file no longer matches the output settings is showing
-              a preview too, and says so: the picture is the source under the new
-              shape, not the file that would be published. */}
-          {!playsRendered && (
-            <span
-              className="status-badge"
-              style={{
-                backgroundColor: '#000',
-                color: '#F9F9F9',
-                borderColor: '#F9F9F9',
-              }}
-            >
-              Preview
-            </span>
-          )}
-          <span
-            style={{
-              // Holds the right edge on a rendered card, where the pill beside
-              // it is gone and `space-between` has nothing to push against.
-              marginLeft: 'auto',
-              padding: '2px 6px',
-              backgroundColor: '#000',
-              color: '#F9F9F9',
-              fontSize: '0.65rem',
-              fontWeight: 900,
-              letterSpacing: '0.05em',
-              whiteSpace: 'nowrap',
-              fontVariantNumeric: 'tabular-nums',
-            }}
-          >
-            {formatTimecode(clip.original_start)}–{formatTimecode(clip.original_end)}
-          </span>
-        </div>
+        {/* Only the clip's score sits over the picture. The timecode and the
+            "Preview" pill were facts about the pipeline, not about whether the
+            clip is worth posting. */}
+        {clip.jevScores && (
+          <div className="clip-card__overlay">
+            {clip.jevScores.tags && clip.jevScores.tags.length > 0 && <JevTags tags={clip.jevScores.tags} />}
+            <JevScoreBadge scores={clip.jevScores} />
+          </div>
+        )}
 
         {!hasApproached ? (
           <div

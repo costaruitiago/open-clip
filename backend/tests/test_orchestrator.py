@@ -365,3 +365,119 @@ def test_a_service_whose_execute_takes_only_a_project_is_not_handed_the_flag(pro
     orchestrator.active_project_orchestrators[PROJECT_ID].join(timeout=5)
 
     assert plain.calls == 1
+
+
+# Stop. A thread cannot be killed, so a stop releases the step at once and the
+# abandoned run is told to write nothing when its request finally returns.
+class StoppableService(BlockingService):
+    supports_stop = True
+
+    def __init__(self):
+        super().__init__()
+        self.saw_stop = []
+
+    def execute(self, project):
+        from backend.src.infrastructure.progress import stop_requested
+        super().execute(project)
+        self.saw_stop.append(stop_requested())
+
+
+def test_stopping_a_step_releases_it_at_once(project_root):
+    service = StoppableService()
+    orchestrator = make_orchestrator({"highlights": service})
+    orchestrator.run_step(PROJECT_ID, "highlights")
+    service.started.wait(timeout=5)
+    old_run = orchestrator.active_project_orchestrators[PROJECT_ID]
+
+    assert orchestrator.stop_step(PROJECT_ID, "highlights") is True
+
+    assert f"{PROJECT_ID}_highlights" not in orchestrator.active_processes
+    service.release.set()
+    old_run.join(timeout=5)
+    assert service.saw_stop == [True]
+
+
+def test_a_stopped_run_finishing_late_does_not_release_the_run_that_replaced_it(project_root):
+    service = StoppableService()
+    orchestrator = make_orchestrator({"highlights": service})
+    orchestrator.run_step(PROJECT_ID, "highlights")
+    service.started.wait(timeout=5)
+    old_run = orchestrator.active_project_orchestrators[PROJECT_ID]
+    orchestrator.stop_step(PROJECT_ID, "highlights")
+
+    orchestrator.run_step(PROJECT_ID, "highlights")  # the new run, still blocked
+    service.release.set()
+    old_run.join(timeout=5)
+    # The new run took the same release; wait for it to finish too, then check
+    # the old run never removed the new run's key while it was still going.
+    orchestrator.active_project_orchestrators[PROJECT_ID].join(timeout=5)
+
+    assert service.calls == 2
+    assert service.saw_stop.count(True) == 1
+
+
+class LeavesWorkBehind:
+    """A step that finishes at once and hands back work to run afterwards."""
+
+    def __init__(self):
+        self.release = threading.Event()
+        # One entry per run: (finished, whether it saw a stop).
+        self.runs = []
+
+    def execute(self, project):
+        run = {"done": threading.Event(), "saw_stop": None}
+        self.runs.append(run)
+
+        def work():
+            from backend.src.infrastructure.progress import stop_requested
+            self.release.wait(timeout=5)
+            run["saw_stop"] = stop_requested()
+            run["done"].set()
+        return {"status": "completed", "background": work}
+
+
+def test_background_work_runs_after_the_step_has_finished(project_root):
+    service = LeavesWorkBehind()
+    orchestrator = make_orchestrator({"highlights": service})
+
+    orchestrator.run_step(PROJECT_ID, "highlights")
+    orchestrator.active_project_orchestrators[PROJECT_ID].join(timeout=5)
+
+    # The step itself is done; its leftover work is still registered so the
+    # page keeps polling, but it is not something the pipeline waits on.
+    assert f"{PROJECT_ID}_highlights" not in orchestrator.active_processes
+    assert f"{PROJECT_ID}_highlights_background" in orchestrator.active_processes
+    assert not orchestrator._has_running_step(PROJECT_ID)
+
+    service.release.set()
+    assert service.runs[0]["done"].wait(timeout=5)
+    assert service.runs[0]["saw_stop"] is False
+
+
+def test_a_new_run_stops_the_last_runs_background_work(project_root):
+    service = LeavesWorkBehind()
+    orchestrator = make_orchestrator({"highlights": service})
+    orchestrator.run_step(PROJECT_ID, "highlights")
+    orchestrator.active_project_orchestrators[PROJECT_ID].join(timeout=5)
+
+    orchestrator.run_step(PROJECT_ID, "highlights")
+    orchestrator.active_project_orchestrators[PROJECT_ID].join(timeout=5)
+    service.release.set()
+
+    first, second = service.runs
+    assert first["done"].wait(timeout=5) and first["saw_stop"] is True
+    assert second["done"].wait(timeout=5) and second["saw_stop"] is False
+
+
+def test_a_step_that_cannot_stop_is_left_running(project_root):
+    service = BlockingService()
+    orchestrator = make_orchestrator({"clipper": service})
+    write_statuses(project_root, {"transcription": "completed", "highlights": "completed"})
+    orchestrator.run_step(PROJECT_ID, "clipper")
+    service.started.wait(timeout=5)
+
+    assert orchestrator.stop_step(PROJECT_ID, "clipper") is False
+    assert f"{PROJECT_ID}_clipper" in orchestrator.active_processes
+
+    service.release.set()
+    orchestrator.active_project_orchestrators[PROJECT_ID].join(timeout=5)

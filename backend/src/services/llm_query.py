@@ -1,18 +1,43 @@
 import json
 import logging
 import re
+import uuid
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from backend.src.dataclasses.data import Project, Highlights, VideoMetadata
 from backend.src.infrastructure.credentials import LocalCredentialProvider
 from backend.src.infrastructure.gemini_client import GeminiClient, describe_error
+from backend.src.infrastructure.progress import StepStopped, report, stop_requested
 from backend.src.infrastructure.schema_validator import validate
+from backend.src.infrastructure.typesafe_client import TypeSafeClient
 from backend.src.services import highlight_options
 from backend.src.services.highlight_options import format_seconds
+from backend.src.services.jev_highlighter import JevHighlighter
 from backend.src.services.llm_tasks import LLMTask, SchemaNotFoundError, discover_tasks
+from backend.src.settings_manager import settings_manager
 
 logger = logging.getLogger(__name__)
+
+# Which model finds the highlights: "gemini" (the HIGHLIGHTS.md prompt) or
+# "jev" (see backend/src/services/jev_highlighter.py).
+HIGHLIGHT_PROVIDER_KEY = "highlight_provider"
+# Kept in a subfolder so discover_tasks, which reads only the top level of
+# backend/config/prompts, does not turn it into a pipeline step of its own.
+JEV_TEXTS_TEMPLATE = Path("backend/config/prompts/jev/HIGHLIGHT_TEXTS.md")
+# Clips cut and titled per round of a Jev run, so titles appear as they come.
+JEV_TITLE_BATCH = 10
+# What Gemini writes for each Jev clip.
+JEV_TEXT_FIELDS = (
+    "viral_hook_text",
+    "thumbnail_text",
+    "video_title_for_youtube_short",
+    "video_description_for_youtube_short",
+    "video_description_for_x",
+    "video_description_for_reddit",
+    "video_description_for_linkedin",
+)
 
 
 @dataclass
@@ -143,6 +168,10 @@ class LLMQuery:
     no change here.
     """
 
+    # The orchestrator may stop this step: a stopped run writes nothing, so a
+    # model answer arriving after the user pressed stop is thrown away.
+    supports_stop = True
+
     def __init__(self, task_name: str, task: Optional[LLMTask] = None):
         self.task_name = task_name
         self._task = task
@@ -198,6 +227,9 @@ class LLMQuery:
                     f"Task '{self.task_name}' has no prompt in backend/config/prompts."
                 )
 
+            if self.task_name == "highlights" and settings_manager.get(HIGHLIGHT_PROVIDER_KEY) == "jev":
+                return self._execute_jev(project, task)
+
             template = task.load_template()
 
             # Resolved before any API call so a task with no schema fails
@@ -222,6 +254,8 @@ class LLMQuery:
                 f"LLMQuery received response from Gemini for task={self.task_name}. Response length={len(response)}"
             )
             logger.debug(f"LLMQuery response content: {response}")
+            if stop_requested():
+                raise StepStopped()
 
             if not task.is_json:
                 project.set_llm_output(self.task_name, response)
@@ -247,9 +281,152 @@ class LLMQuery:
             self.end_service(project)
             logger.info(f"LLMQuery completed task={self.task_name} for project={project.project_id}")
             return {"status": "completed"}
+        except StepStopped:
+            logger.info(f"LLMQuery task={self.task_name} stopped; discarding its result")
+            return {"status": "stopped"}
         except SchemaNotFoundError as e:
             logger.warning(f"Task '{self.task_name}' cannot run: {e}")
             return self.fail(project, str(e))
         except Exception as e:
+            if stop_requested():
+                # Stopped already: the step's status belongs to whatever ran
+                # after, and an error from the abandoned request is not news.
+                logger.info(f"LLMQuery task={self.task_name} failed after being stopped: {describe_error(e)}")
+                return {"status": "stopped"}
             logger.error(f"Error executing {self.task_name}: {describe_error(e)}", exc_info=True)
             return self.fail(project, describe_error(e))
+
+    def _execute_jev(self, project: Project, task: LLMTask) -> Dict[str, str]:
+        """Jev picks and cuts the clips; Gemini then writes their titles and descriptions."""
+        schema = task.load_schema()
+        gemini_key = LocalCredentialProvider().load("gemini_api_key")
+        if not gemini_key:
+            # Checked before Jev is paid: Jev picks the clips, but their
+            # titles and descriptions still come from Gemini.
+            raise ValueError("Gemini API key not found in secrets. It writes the titles for Jev's clips.")
+
+        client = TypeSafeClient(
+            api_key=settings_manager.get("typesafe_api_key"),
+            base_url=settings_manager.get("typesafe_api_url") or None,
+        )
+        options = highlight_options.resolve(project)
+        highlighter = JevHighlighter(client)
+        moments = highlighter.find_moments(project, options)
+        run_id = uuid.uuid4().hex
+        payloads = [highlighter.payload(m, run_id) for m in moments]
+        logger.info(f"Jev found {len(moments)} moments for project={project.project_id}")
+
+        # Saved before any title exists, so the cards appear while the rest of
+        # the run fills them in.
+        result = {"shorts": payloads}
+        errors = validate(result, schema)
+        if errors:
+            return self.fail(project, f"Jev highlights failed schema validation: {'; '.join(errors[:10])}")
+        self.adapter.apply(project, result)
+        # Done as far as anything downstream is concerned: the clips exist and
+        # can be cut. Their loop cuts and titles are filled in afterwards, in the
+        # background, so nothing waits on Gemini.
+        self.end_service(project)
+
+        gemini = GeminiClient(api_key=gemini_key)
+
+        def fill_in() -> None:
+            self._fill_in_jev_clips(project, highlighter, options, gemini, run_id, moments, payloads)
+
+        return {"status": "completed", "background": fill_in}
+
+    def _fill_in_jev_clips(self, project: Project, highlighter: JevHighlighter, options,
+                           gemini: GeminiClient, run_id: str, moments, payloads) -> None:
+        """Chooses each Jev clip's cut and has Gemini title it, best first, in batches.
+
+        Runs after the step has finished. Each batch is written as soon as it is
+        done, so the cards fill in while the user works. Stops when the
+        orchestrator says so — a new highlights run — or when the highlights on
+        disk no longer belong to this run.
+        """
+        order = sorted(range(len(moments)), key=lambda i: -moments[i]["score"])
+        untitled = 0
+        for first in range(0, len(order), JEV_TITLE_BATCH):
+            if stop_requested():
+                return
+            batch = order[first:first + JEV_TITLE_BATCH]
+            try:
+                for i in batch:
+                    highlighter.choose_cut(moments[i], options)
+                    payloads[i] = highlighter.payload(moments[i], run_id)
+            except StepStopped:
+                return
+            try:
+                texts = self._write_jev_texts(project, [payloads[i] for i in batch], gemini)
+            except Exception as e:
+                # The clips are already Jev's work; a batch Gemini will not title
+                # stays untitled rather than costing the rest.
+                logger.warning(f"Gemini could not title a batch of Jev clips: {describe_error(e)}")
+                texts = {}
+                untitled += len(batch)
+            for position, i in enumerate(batch):
+                payloads[i].update(texts.get(position, {}))
+            if stop_requested():
+                return
+            if self._merge_jev_batch(project.project_id, run_id, [payloads[i] for i in batch]) == 0:
+                logger.info(f"Highlights of {project.project_id} were replaced; stopping Jev run {run_id}")
+                return
+
+        if untitled:
+            Project(project.project_id).partial_step(
+                self.task_name,
+                f"Gemini could not write titles for {untitled} of {len(order)} clips. "
+                "Run Highlights again to retry.",
+            )
+        logger.info(f"Jev run {run_id} filled in {len(order) - untitled} of {len(order)} clips")
+
+    @staticmethod
+    def _merge_jev_batch(project_id: str, run_id: str, payloads: List[Dict[str, Any]]) -> int:
+        """Writes one batch's cuts and titles onto the highlights saved earlier.
+
+        Read fresh from disk and matched by run and start, because the user can
+        edit a card while the run goes on. A clip that has been trimmed or cut
+        meanwhile keeps its window: only its texts and scores are filled in.
+        Returns how many highlights it matched; none means the run was replaced.
+
+        Done inside the metadata lock on the stored dicts, not by loading a
+        Project and saving its list: the clipper may be writing a clip it just
+        cut at the same moment, and a whole-list save from an older read would
+        undo it.
+        """
+        by_start = {p["start"]: p for p in payloads}
+        matched = 0
+
+        def merge(data: Dict[str, Any]) -> None:
+            nonlocal matched
+            for stored in data.get("highlights") or []:
+                scores = stored.get("jev_scores") or {}
+                payload = by_start.get(stored.get("start"))
+                if payload is None or scores.get("run") != run_id:
+                    continue
+                matched += 1
+                for field in JEV_TEXT_FIELDS:
+                    if payload.get(field):
+                        stored[field] = payload[field]
+                stored["jev_scores"] = payload["jev_scores"]
+                if not stored.get("trimmed_at") and not stored.get("is_clip_generated"):
+                    stored["end"] = payload["end"]
+                    stored["highlight_text"] = payload["highlight_text"]
+
+        Project(project_id)._mutate_metadata(merge)
+        return matched
+
+    @staticmethod
+    def _write_jev_texts(project: Project, picks: List[Dict[str, Any]],
+                         client: GeminiClient) -> Dict[int, Dict[str, Any]]:
+        """Titles, hooks and descriptions for already-chosen segments, keyed by index."""
+        segments = [{"index": i, "text": pick["highlight_text"]} for i, pick in enumerate(picks)]
+        prompt = build_prompt(JEV_TEXTS_TEMPLATE.read_text(encoding="utf-8"), project)
+        prompt += json.dumps(segments, ensure_ascii=False, indent=1)
+        response = json.loads(client.generate_content(prompt, is_json=True))
+        items = response.get("shorts", []) if isinstance(response, dict) else []
+        return {
+            item["index"]: {k: v for k, v in item.items() if k != "index" and isinstance(v, str)}
+            for item in items
+            if isinstance(item, dict) and isinstance(item.get("index"), int)
+        }

@@ -5,6 +5,7 @@ from pathlib import Path
 from backend.src.dataclasses.data import UPLOAD_PRIVACY_CHOICES, Highlight, Project
 from backend.src.infrastructure.progress import report
 from backend.src.infrastructure.youtube_client import YoutubeClient
+from backend.src.services import highlight_options
 from backend.src.services.clipper import Clipper
 from backend.src.services.description_builder import build_description
 from backend.src.services.schedule import day_window, slot_time
@@ -495,21 +496,24 @@ class Uploader:
         uploads_list = []
         failures: List[str] = []
         skipped = 0
-        total = len(project.highlights)
-        # Every highlight, cut or not: each one is re-cut on its way up, so this
-        # step no longer needs the clipper to have run first — it only needs the
-        # source video and the highlights.
+        # Every one of the project's clips, cut or not: each one is re-cut on
+        # its way up, so this step no longer needs the clipper to have run
+        # first — it only needs the source video and the highlights. Moments
+        # below a Jev cutoff are not the project's clips and are never
+        # published by this step; each can still be published from its card.
+        selected = sorted(highlight_options.selected_indices(project))
+        total = len(selected)
         #
         # Indexes, not the highlights themselves: each upload is written back
         # onto its highlight, which reloads the list from disk.
-        for index in range(total):
+        for number, index in enumerate(selected, 1):
             if not (full or replace) and self.is_published(project.highlights[index]):
                 # Already on YouTube. Publishing it again does not replace that
                 # video, it makes a second one — and nothing in this app can
                 # take either of them down.
                 skipped += 1
                 continue
-            report(f"Clip {index + 1} of {total}: cutting, then publishing")
+            report(f"Clip {number} of {total}: cutting, then publishing")
             try:
                 if replace:
                     uploads_list.append(self.replace_one(project, index, client))
@@ -540,11 +544,14 @@ class Uploader:
         that published the last two missing clips completes the step, and a run
         that published nine of ten does not.
         """
-        missing = [h for h in project.highlights if not self.is_published(h)]
+        selected = highlight_options.selected_indices(project)
+        missing = [
+            h for i, h in enumerate(project.highlights) if i in selected and not self.is_published(h)
+        ]
         if not missing:
             self.end_service(project)
             return
-        if len(missing) == len(project.highlights):
+        if len(missing) == len(selected):
             project.fail_step(
                 "upload",
                 f"No clip could be published. The first failure was: {failures[0]}"
@@ -555,6 +562,6 @@ class Uploader:
         reason = f" The first failure was: {failures[0]}" if failures else ""
         project.partial_step(
             "upload",
-            f"{len(missing)} of {len(project.highlights)} clips are not on YouTube yet."
+            f"{len(missing)} of {len(selected)} clips are not on YouTube yet."
             f"{reason} Run this step again to publish only those.",
         )

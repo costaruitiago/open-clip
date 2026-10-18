@@ -33,6 +33,7 @@ from backend.src.infrastructure.postiz_client import (
     PostizRejectedPostsError,
 )
 from backend.src.infrastructure.progress import report
+from backend.src.services import highlight_options
 from backend.src.services.clipper import Clipper
 from backend.src.services.description_builder import (
     build_description,
@@ -1270,11 +1271,14 @@ class PostizPublisher:
 
         imported: List[Dict[str, Any]] = []
         failures: List[str] = []
-        total = len(project.highlights)
+        # Only the project's clips; moments below a Jev cutoff are imported
+        # one at a time from their card, never by this step.
+        selected = sorted(highlight_options.selected_indices(project))
+        total = len(selected)
         # Indexes, not the highlights themselves: each import is written back
         # onto its highlight, which reloads the list from disk.
         skipped = 0
-        for index in range(total):
+        for number, index in enumerate(selected, 1):
             if self.is_current(project.highlights[index]):
                 # Already filed since it was last cut — by the clipper handing
                 # it over as it finished, most often. Filing it again would put
@@ -1283,7 +1287,7 @@ class PostizPublisher:
                 continue
             # The one thing the page can say about a step that spends minutes
             # per clip. Without it the whole run looks identical to a hang.
-            report(f"Clip {index + 1} of {total}: cutting, then sending to Postiz")
+            report(f"Clip {number} of {total}: cutting, then sending to Postiz")
             try:
                 imported.append(
                     self.import_one(project, index, client=client, channels=channels)
@@ -1323,11 +1327,14 @@ class PostizPublisher:
         to be called unconditionally, so one draft out of twenty read as "done"
         and nothing said the other nineteen were never made.
         """
-        missing = [h for h in project.highlights if not self.is_current(h)]
+        selected = highlight_options.selected_indices(project)
+        missing = [
+            h for i, h in enumerate(project.highlights) if i in selected and not self.is_current(h)
+        ]
         if not missing:
             self.end_service(project)
             return
-        if len(missing) == len(project.highlights):
+        if len(missing) == len(selected):
             # Nothing is filed. Reporting that as a completed step is how a
             # user ends up looking for drafts that were never made.
             project.fail_step(
@@ -1341,6 +1348,6 @@ class PostizPublisher:
         reason = f" The first failure was: {failures[0]}" if failures else ""
         project.partial_step(
             "postiz",
-            f"{len(missing)} of {len(project.highlights)} clips are not in Postiz yet."
+            f"{len(missing)} of {len(selected)} clips are not in Postiz yet."
             f"{reason} Run this step again to import only those.",
         )

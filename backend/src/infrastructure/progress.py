@@ -50,6 +50,38 @@ def reporting_to(sink: Sink) -> Iterator[None]:
         _local.sink = previous
 
 
+class StepStopped(Exception):
+    """Raised inside a step that noticed it was stopped, to end it early."""
+
+
+@contextmanager
+def stoppable(event: threading.Event) -> Iterator[None]:
+    """Lets code on this thread ask, through `stop_requested`, whether `event` is set.
+
+    A Python thread cannot be killed, so stopping a step means telling it: the
+    orchestrator sets the event, and the step checks before anything it would
+    regret doing after the user pressed stop — paying for another request, or
+    writing a result over the run that replaced it.
+    """
+    previous: Optional[threading.Event] = getattr(_local, "stop_event", None)
+    _local.stop_event = event
+    try:
+        yield
+    finally:
+        _local.stop_event = previous
+
+
+def stop_requested() -> bool:
+    """Whether the step running on this thread has been stopped."""
+    event: Optional[threading.Event] = getattr(_local, "stop_event", None)
+    return bool(event and event.is_set())
+
+
+def raise_if_stopped() -> None:
+    if stop_requested():
+        raise StepStopped()
+
+
 def report(message: str) -> None:
     """Says what is happening now, replacing whatever was last said.
 

@@ -182,8 +182,10 @@ describe('Clip Component', () => {
     expect(videoElement?.getAttribute('src')).toBe(SOURCE_URL);
     // Native controls would scrub the whole source, past the window's edges.
     expect(videoElement?.hasAttribute('controls')).toBe(false);
-    expect(screen.getByText('Preview')).toBeDefined();
-    expect(screen.getByText('0:01–1:05')).toBeDefined();
+    // Neither a "Preview" pill nor a timecode: pipeline facts, not anything
+    // that says whether the clip is worth posting.
+    expect(screen.queryByText('Preview')).toBeNull();
+    expect(screen.queryByText('0:01–1:05')).toBeNull();
   });
 
   // Changing the project's aspect ratio re-shapes the preview and re-cuts
@@ -194,8 +196,7 @@ describe('Clip Component', () => {
     renderClip({ ...renderedClip, outputStale: true });
 
     expect(document.querySelector('video')?.getAttribute('src')).toBe(SOURCE_URL);
-    // And says so, rather than letting the wrong crop pass for the render.
-    expect(screen.getByText('Preview')).toBeDefined();
+    // The re-render button is what says so.
     expect(
       screen.getByLabelText('Re-render this clip; the output settings changed after it was cut')
     ).toBeDefined();

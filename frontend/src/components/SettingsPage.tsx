@@ -26,6 +26,18 @@ const POSTIZ_FIELDS = [
   { field: 'platform.name', description: 'The platform itself, e.g. x, linkedin' },
 ];
 
+/** Languages offered for transcription, as Whisper codes. "auto" lets Whisper guess. */
+const TRANSCRIPTION_LANGUAGES: [string, string][] = [
+  ['en', 'English'],
+  ['pt', 'Portuguese'],
+  ['es', 'Spanish'],
+  ['fr', 'French'],
+  ['de', 'German'],
+  ['it', 'Italian'],
+  ['nl', 'Dutch'],
+  ['auto', 'Detect automatically'],
+];
+
 interface SettingsPageProps {
   theme: 'light' | 'dark';
   setTheme: (theme: 'light' | 'dark') => void;
@@ -116,6 +128,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
   const [postizKey, setPostizKey] = useState('');
   const [showPostizKey, setShowPostizKey] = useState(false);
   const [postizUrl, setPostizUrl] = useState('');
+  const [typesafeKey, setTypesafeKey] = useState('');
+  const [showTypesafeKey, setShowTypesafeKey] = useState(false);
+  const [typesafeUrl, setTypesafeUrl] = useState('');
   // Paragraphs typed once, so they are saved when the user leaves the box —
   // the same way the description template is.
   const [postizText, setPostizText] = useState('');
@@ -126,6 +141,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
   const debouncedYtSecrets = useDebounce(ytSecrets, 500);
   const debouncedPostizKey = useDebounce(postizKey, 500);
   const debouncedPostizUrl = useDebounce(postizUrl, 500);
+  const debouncedTypesafeKey = useDebounce(typesafeKey, 500);
+  const debouncedTypesafeUrl = useDebounce(typesafeUrl, 500);
 
   // Track whether the local state has been initialized from server data
   const [initialized, setInitialized] = useState(false);
@@ -138,6 +155,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
       setDescriptionTemplate(data.settings?.description_defaults?.template || '');
       setPostizKey(data.settings?.postiz_api_key || '');
       setPostizUrl(data.settings?.postiz_api_url || '');
+      setTypesafeKey(data.settings?.typesafe_api_key || '');
+      setTypesafeUrl(data.settings?.typesafe_api_url || '');
       setPostizText(data.settings?.postiz_text_template || '');
       setPostizComment(data.settings?.postiz_comment_template || '');
       setInitialized(true);
@@ -187,6 +206,21 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
       queryClient.invalidateQueries({ queryKey: ['postizStatus'] });
     }
   }, [debouncedPostizUrl, postizUrl, data, initialized, saveSettings, queryClient]);
+
+  // The Jev key and host are saved the way the Gemini key is.
+  useEffect(() => {
+    if (!initialized || !data || debouncedTypesafeKey !== typesafeKey) return;
+    if (debouncedTypesafeKey !== (data.settings?.typesafe_api_key || '')) {
+      saveSettings({ settings: { typesafe_api_key: debouncedTypesafeKey } });
+    }
+  }, [debouncedTypesafeKey, typesafeKey, data, initialized, saveSettings]);
+
+  useEffect(() => {
+    if (!initialized || !data || debouncedTypesafeUrl !== typesafeUrl) return;
+    if (debouncedTypesafeUrl !== (data.settings?.typesafe_api_url || '')) {
+      saveSettings({ settings: { typesafe_api_url: debouncedTypesafeUrl } });
+    }
+  }, [debouncedTypesafeUrl, typesafeUrl, data, initialized, saveSettings]);
 
   if (isLoading) return <div style={{ padding: 'var(--space-md)', fontWeight: 'bold', textTransform: 'uppercase' }}>Loading settings...</div>;
 
@@ -398,6 +432,52 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
               {showApiKey ? 'Hide' : 'Show'}
             </button>
           </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-xs)' }}>
+          <label htmlFor="typesafe-api-key" style={{ fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.9rem' }}>Jev (TypeSafe) API Key:</label>
+          <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
+            <input
+              id="typesafe-api-key"
+              type={showTypesafeKey ? 'text' : 'password'}
+              autoComplete="off"
+              spellCheck={false}
+              value={typesafeKey}
+              onChange={(e) => setTypesafeKey(e.target.value)}
+              style={inputStyle}
+            />
+            <button
+              type="button"
+              onClick={() => setShowTypesafeKey((v) => !v)}
+              aria-pressed={showTypesafeKey}
+              style={{
+                padding: 'var(--space-md)',
+                minHeight: '44px',
+                whiteSpace: 'nowrap',
+                fontSize: '0.8rem',
+              }}
+            >
+              {showTypesafeKey ? 'Hide' : 'Show'}
+            </button>
+          </div>
+          <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>
+            In the TypeSafe console under API Keys.
+          </span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-xs)' }}>
+          <label htmlFor="typesafe-api-url" style={{ fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.9rem' }}>Jev (TypeSafe) URL:</label>
+          <input
+            id="typesafe-api-url"
+            type="text"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="https://api.typesafe.ai"
+            value={typesafeUrl}
+            onChange={(e) => setTypesafeUrl(e.target.value)}
+            style={inputStyle}
+          />
+          <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>
+            Leave empty for TypeSafe cloud. Set it only to go through a gateway.
+          </span>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-xs)' }}>
           <label style={{ fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.9rem' }}>YouTube Client Secrets (JSON):</label>
@@ -1097,6 +1177,24 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
             What a clip card shows while it sits still. Each project can change its own.
           </span>
         </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-xs)' }}>
+          <label htmlFor="transcription-language" style={{ fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.9rem' }}>Spoken language:</label>
+          <select
+            id="transcription-language"
+            value={settings.transcription_language || 'en'}
+            onChange={(e) => saveSettings({ settings: { transcription_language: e.target.value } })}
+            style={inputStyle}
+          >
+            {TRANSCRIPTION_LANGUAGES.map(([code, name]) => (
+              <option key={code} value={code}>{name}</option>
+            ))}
+          </select>
+          <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>
+            The language the videos are spoken in. Used when a video is transcribed, so change it
+            before transcribing; everything else reads the transcript.
+          </span>
+        </div>
       </section>
 
       {/* Highlights Section. Read when the step runs rather than copied into a
@@ -1143,9 +1241,53 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
           />
           <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>
             Added to the prompt as standing instructions. They outrank its own preferences but not
-            its rules — the loop test, the verbatim text and the timings still hold.
+            its rules — the hook, the complete arc, the verbatim text and the timings still hold.
           </span>
         </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-xs)' }}>
+          <label htmlFor="highlight-provider" style={{ fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.9rem' }}>Found by:</label>
+          <select
+            id="highlight-provider"
+            value={settings.highlight_provider || 'gemini'}
+            onChange={(e) => saveSettings({ settings: { highlight_provider: e.target.value as 'gemini' | 'jev' } })}
+            style={inputStyle}
+          >
+            <option value="gemini">Gemini</option>
+            <option value="jev">Jev (TypeSafe)</option>
+          </select>
+          <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>
+            Jev scores every stretch of the transcript and picks the best ones; Gemini still writes
+            their titles and descriptions, so Jev needs both keys.
+          </span>
+        </div>
+
+        {settings.highlight_provider === 'jev' && (
+          <>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-xs)' }}>
+              <label htmlFor="jev-min-score" style={{ fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.9rem' }}>Minimum clip score:</label>
+              <input
+                id="jev-min-score"
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                key={`jev-min-score-${settings.jev_min_score ?? 0}`}
+                defaultValue={Math.round((settings.jev_min_score ?? 0) * 100)}
+                onBlur={(e) => {
+                  const next = Math.min(100, Math.max(0, Math.round(Number(e.target.value) || 0))) / 100;
+                  if (next !== (settings.jev_min_score ?? 0)) saveSettings({ settings: { jev_min_score: next } });
+                }}
+                style={inputStyle}
+              />
+              <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>
+                From 0 to 100, where 100 is each video's best clip and 0 its weakest. Used by every
+                project that has not set its own in its clips menu. Lower-scoring clips go under
+                “show more”.
+              </span>
+            </div>
+          </>
+        )}
       </section>
 
       {/* YouTube Description Section. Unlike the caption defaults above, these

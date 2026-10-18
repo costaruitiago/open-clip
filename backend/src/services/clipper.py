@@ -8,6 +8,7 @@ from typing import Callable, List, Dict, Any, Optional, Tuple
 from backend.src.dataclasses.data import Highlight, Project, Clip
 from backend.src.infrastructure.progress import report
 from backend.src.infrastructure.video_engine import OpenCVVideoEngine
+from backend.src.services import highlight_options
 from backend.src.services.captions import CaptionService
 
 logger = logging.getLogger(__name__)
@@ -190,12 +191,15 @@ class Clipper:
                     input_path, project.settings.aspect_ratio, project.settings.resolution
                 )
 
-            total = len(project.highlights)
+            # Only the project's clips: a Jev run also keeps the moments below
+            # its cutoff, and those are cut one at a time from their own card.
+            selected = sorted(highlight_options.selected_indices(project))
+            total = len(selected)
             skipped = 0
             failures: List[str] = []
             # Indexes, not the highlights themselves: each render is written
             # back onto its highlight, which reloads the list from disk.
-            for i in range(total):
+            for number, i in enumerate(selected, 1):
                 short = project.highlights[i]
                 # A file cut under other output settings is not this project's
                 # clip any more — the page already calls it stale — so a resume
@@ -203,7 +207,7 @@ class Clipper:
                 if not full and self.has_clip(project, short) and self.matches_output(project, short):
                     skipped += 1
                     continue
-                report(f"Cutting clip {i + 1} of {total}")
+                report(f"Cutting clip {number} of {total}")
                 try:
                     self._render_highlight(project, engine, input_path, clips_dir, i, short, dimensions)
                 except Exception as e:
@@ -241,15 +245,16 @@ class Clipper:
         nothing because everything was already there is a completed step, and a
         run that cut nine of ten is not, however well the nine went.
         """
+        selected = highlight_options.selected_indices(project)
         missing = [
             index
             for index, highlight in enumerate(project.highlights)
-            if not self.has_clip(project, highlight)
+            if index in selected and not self.has_clip(project, highlight)
         ]
         if not missing:
             self.end_service(project)
             return
-        if len(missing) == len(project.highlights):
+        if len(missing) == len(selected):
             project.fail_step(
                 "clipper",
                 f"No clip could be cut. The first failure was: {failures[0]}"
@@ -260,7 +265,7 @@ class Clipper:
         reason = f" The first failure was: {failures[0]}" if failures else ""
         project.partial_step(
             "clipper",
-            f"{len(missing)} of {len(project.highlights)} clips have no file yet."
+            f"{len(missing)} of {len(selected)} clips have no file yet."
             f"{reason} Run this step again to cut only those.",
         )
 
@@ -308,7 +313,8 @@ class Clipper:
         # re-cut only completes the step if it was the last one missing. A
         # failed render leaves the status alone rather than claiming an error
         # for clips that are still perfectly good.
-        if all(self.has_clip(project, h) for h in project.highlights):
+        selected = highlight_options.selected_indices(project)
+        if all(self.has_clip(project, h) for i, h in enumerate(project.highlights) if i in selected):
             project.set_step_status("clipper", "completed")
         return highlight.to_dict()
 

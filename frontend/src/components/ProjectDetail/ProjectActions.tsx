@@ -4,6 +4,8 @@ import { PipelineActivity, PipelineController, isStepDone } from '../PipelineCon
 import type { StepStatus } from '../PipelineController/PipelineController';
 import { ProjectSettingsMenu } from './ProjectSettingsMenu';
 import { WritingPanel } from './WritingPanel';
+import { JevScorePanel } from './JevScorePanel';
+import { useClipSelection } from '../../hooks/useClipSelection';
 import {
   downloadMarkerEdl,
   getExecutionStatus,
@@ -50,10 +52,12 @@ export const ProjectActions: React.FC<ProjectActionsProps> = ({
 }) => {
   // One at a time: two panels hanging over the page from the same bar would
   // overlap each other.
-  const [openMenu, setOpenMenu] = useState<'pipeline' | 'settings' | 'writing' | null>(null);
+  const [openMenu, setOpenMenu] = useState<'pipeline' | 'clips' | 'settings' | 'writing' | null>(null);
   const pipelineMenuId = useId();
+  const clipsMenuId = useId();
   const settingsMenuId = useId();
   const writingMenuId = useId();
+  const selection = useClipSelection(metadata);
   const exportErrorId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -182,6 +186,36 @@ export const ProjectActions: React.FC<ProjectActionsProps> = ({
           </div>
         )}
       </div>
+
+      {/* Only for scored highlights: which of them count as clips is the one
+          thing about them worth a control, and it lives here rather than as a
+          band across the page. */}
+      {selection.selected && (
+        <div style={{ position: 'relative' }}>
+          <button
+            type="button"
+            className="nav-action"
+            onClick={() => setOpenMenu(openMenu === 'clips' ? null : 'clips')}
+            aria-expanded={openMenu === 'clips'}
+            aria-controls={clipsMenuId}
+          >
+            {selection.selected.size} of {selection.total} clips
+          </button>
+
+          {openMenu === 'clips' && (
+            <div id={clipsMenuId} className="project-actions__menu menu-enter">
+              <JevScorePanel
+                key={selection.cutoff}
+                projectId={projectId}
+                cutoff={selection.cutoff}
+                hasOwnCutoff={selection.hasOwnCutoff}
+                clipCount={selection.selected.size}
+                total={selection.total}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={{ position: 'relative' }}>
         <button

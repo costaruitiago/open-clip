@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Optional
 from backend.src.dataclasses.data import Highlight, OverlayText, Project, ThumbnailSettings
 from backend.src.infrastructure.progress import report
 from backend.src.infrastructure.video_engine import OpenCVVideoEngine
+from backend.src.services import highlight_options
 from backend.src.services.ass_writer import render_still_ass
 from backend.src.services.captions import CaptionService
 
@@ -298,12 +299,14 @@ class Thumbnailer:
             # and doing that per clip is most of the time a batch would take.
             engine = engine or OpenCVVideoEngine("root/yolov8n.pt")
 
-            total = len(project.highlights)
+            # Only the project's clips, not the moments below a Jev cutoff.
+            selected = sorted(highlight_options.selected_indices(project))
+            total = len(selected)
             failures: List[str] = []
             # Indexes, not the highlights themselves: every render writes back
             # onto its highlight, which replaces the list.
-            for index in range(total):
-                report(f"Drawing thumbnail {index + 1} of {total}")
+            for number, index in enumerate(selected, 1):
+                report(f"Drawing thumbnail {number} of {total}")
                 try:
                     self.generate(project, index, engine=engine)
                 except Exception as e:
@@ -336,15 +339,16 @@ class Thumbnailer:
         nothing because everything was there is a finished step, and a run that
         drew nine of ten is not, however well the nine went.
         """
+        selected = highlight_options.selected_indices(project)
         missing = [
             index
             for index, highlight in enumerate(project.highlights)
-            if not self.has_thumbnail(project, highlight)
+            if index in selected and not self.has_thumbnail(project, highlight)
         ]
         if not missing:
             self.end_service(project)
             return
-        if len(missing) == len(project.highlights):
+        if len(missing) == len(selected):
             project.fail_step(
                 self.STEP,
                 f"No thumbnail could be drawn. The first failure was: {failures[0]}"
@@ -355,7 +359,7 @@ class Thumbnailer:
         reason = f" The first failure was: {failures[0]}" if failures else ""
         project.partial_step(
             self.STEP,
-            f"{len(missing)} of {len(project.highlights)} clips have no thumbnail."
+            f"{len(missing)} of {len(selected)} clips have no thumbnail."
             f"{reason} Run this step again to try them again.",
         )
 

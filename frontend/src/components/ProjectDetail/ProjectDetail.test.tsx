@@ -153,18 +153,15 @@ describe('ProjectDetail', () => {
     expect(heading.className).toContain('visually-hidden');
   });
 
-  // This asserted a "Rendered" pill until it was noticed that the pill had been
-  // deliberately removed: a cut file playing from its own start already says it
-  // exists, and `Clip.test.tsx` asserts its absence. The claim worth making is
-  // the one in the name — a card per highlight either way, and only the uncut
-  // ones announcing themselves.
-  it('shows a preview card for every highlight, cut or not', () => {
+  // A card per highlight, cut or not, and neither labelled by its pipeline
+  // state: "Rendered" and "Preview" both said nothing about the clip itself.
+  it('shows a card for every highlight, cut or not', () => {
     renderDetail({
       metadata: metadata([highlight('rendered one', 'clip_000.mp4'), highlight('still a preview')]),
     });
 
     expect(document.querySelectorAll('.clip-card')).toHaveLength(2);
-    expect(screen.getAllByText('Preview')).toHaveLength(1);
+    expect(screen.queryByText('Preview')).toBeNull();
     expect(screen.queryByText('Rendered')).toBeNull();
   });
 

@@ -1,9 +1,24 @@
 import logging
+from typing import Optional
 from backend.src.dataclasses.data import Project
 from backend.src.services.transcription_mapper import TranscriptionResult, parse_whisper_result
 from backend.src.infrastructure.whisper_client import WhisperClient
+from backend.src.settings_manager import settings_manager
 
 logger = logging.getLogger(__name__)
+
+# The language the video is in, as a Whisper code ("en", "pt", ...), or "auto"
+# to let Whisper guess. Guessing is what let a single-language podcast come back
+# with stretches of four other languages in it, so English is the default.
+LANGUAGE_KEY = "transcription_language"
+DEFAULT_LANGUAGE = "en"
+AUTO_DETECT = "auto"
+
+
+def transcription_language() -> Optional[str]:
+    """The language to tell Whisper, or None to let it detect one."""
+    language = str(settings_manager.get(LANGUAGE_KEY) or DEFAULT_LANGUAGE).strip().lower()
+    return None if language == AUTO_DETECT else language
 
 class Transcriber:
     """
@@ -37,10 +52,12 @@ class Transcriber:
 
         client = WhisperClient()
         file_path = str(project.get_artifact_path("original_file"))
-        logger.info(f"Transcriber calling Whisper for file={file_path}")
+        language = transcription_language()
+        logger.info(f"Transcriber calling Whisper for file={file_path}, language={language or 'auto'}")
 
         result = client.transcribe(
             file_path,
+            language=language,
             word_timestamps=True,
             no_speech_threshold=0.6,
             logprob_threshold=-1.0,

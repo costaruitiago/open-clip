@@ -430,6 +430,10 @@ class Highlight:
     # a frame for. None is not "no thumbnail": it means the defaults, which is
     # exactly what a thumbnail rendered without any input uses.
     thumbnail: Optional[ThumbnailSettings] = None
+    # What Jev answered about this clip when Jev picked it — hook, arc, the
+    # combined score, and the loop probability with whether the cut used it —
+    # or None for a clip Gemini picked.
+    jev_scores: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         data = asdict(self)
@@ -522,6 +526,7 @@ class Highlight:
                 if isinstance(data.get("thumbnail"), dict)
                 else None
             ),
+            jev_scores=data.get("jev_scores") if isinstance(data.get("jev_scores"), dict) else None,
         )
 
 @dataclass
@@ -706,6 +711,10 @@ class HighlightSettings:
     min_duration: Optional[float] = None
     max_duration: Optional[float] = None
     guidance: str = ""
+    # The Jev score a clip needs to count as one of this project's clips rather
+    # than one of the moments below the cutoff. None follows the application's
+    # `jev_min_score`. Moved freely after a run: every moment is already scored.
+    jev_min_score: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -722,6 +731,7 @@ class HighlightSettings:
             min_duration=_as_duration(data.get("min_duration"), 1, HIGHLIGHT_MAX_DURATION),
             max_duration=_as_duration(data.get("max_duration"), 1, HIGHLIGHT_MAX_DURATION),
             guidance=str(data.get("guidance") or ""),
+            jev_min_score=_as_duration(data.get("jev_min_score"), 0, 1),
         )
 
 

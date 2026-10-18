@@ -407,6 +407,88 @@ button[aria-disabled='true'] {
   pointer-events: none;
 }
 
+/* Jev's score, opposite the Preview pill. It takes the pointer back from the
+   overlay so it can be hovered; the breakdown opens under it on hover or focus.
+   Fixed colours like the other chips: the ground is the letterbox. */
+.jev-score {
+  position: relative;
+  pointer-events: auto;
+  margin-left: auto;
+  padding: 2px 6px;
+  background: #000;
+  color: #F9F9F9;
+  border: 1px solid #F9F9F9;
+  font-size: 0.65rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  cursor: help;
+}
+.jev-score:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.jev-score__detail {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 220px;
+  padding: var(--space-sm);
+  background: #000;
+  color: #F9F9F9;
+  border: 1px solid #F9F9F9;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 700;
+  letter-spacing: normal;
+  white-space: normal;
+  z-index: 3;
+}
+.jev-score:hover .jev-score__detail,
+.jev-score:focus .jev-score__detail {
+  display: flex;
+}
+.jev-score__row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+/* What a clip is outstanding at, top-left over the picture. */
+.jev-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.jev-tag {
+  padding: 2px 6px;
+  background: var(--accent);
+  color: #000;
+  font-size: 0.6rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.jev-score__total {
+  margin-top: 2px;
+  padding-top: 4px;
+  border-top: 1px solid #F9F9F9;
+}
+
+/* Moments below the Jev cutoff: still usable, visibly not the project's clips. */
+.clip-below-cutoff {
+  opacity: 0.55;
+  filter: grayscale(0.6);
+  transition: opacity 200ms var(--ease-out-quart), filter 200ms var(--ease-out-quart);
+}
+.clip-below-cutoff:hover,
+.clip-below-cutoff:focus-within {
+  opacity: 1;
+  filter: none;
+}
+
 /* The scrub bar is a ~20px track sitting in a 44px row, which is a target a
    mouse hits and a thumb misses. Sizing the input itself to the row keeps the
    thumb where it was and makes the whole strip pressable. */

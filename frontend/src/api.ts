@@ -222,6 +222,26 @@ export type CaptionPreview = {
  * that a view reading one has to decide what to show when it is absent, rather
  * than rendering `undefined` as a blank.
  */
+/**
+ * Jev's answers for one clip, each a probability from 0 to 1. `score` weights
+ * them 50% hook, 40% attention, 10% stands alone; `relative` is that score
+ * stretched across the video (its best moment 1, its weakest 0), which is what
+ * the card shows and the cutoff is compared against. `tags` names the answers
+ * at or above 0.8. The loop is not in the score: `loop` stays null until the
+ * run has chosen this clip's cut, and `loop_used` says whether the clip ends
+ * on a word that runs back into its opening.
+ */
+export type JevScores = {
+  score: number;
+  relative?: number;
+  tags?: string[];
+  hook?: number;
+  standalone?: number;
+  attention?: number;
+  loop?: number | null;
+  loop_used?: boolean;
+};
+
 export type Highlight = {
   start: number;
   end: number;
@@ -265,6 +285,8 @@ export type Highlight = {
    *  trim re-cuts nothing, so a stamp later than `rendered_at` means the file
    *  on disk still holds the window before the edit. */
   trimmed_at?: string | null;
+  /** What Jev answered about this clip, or absent for a clip Gemini picked. */
+  jev_scores?: JevScores | null;
   /** Where this clip was published, once it has been uploaded to YouTube. */
   youtube_video_id?: string | null;
   youtube_url?: string | null;
@@ -408,6 +430,9 @@ export type HighlightProjectSettings = {
   max_duration: number | null;
   /** Extra instructions for this project, in the user's own words. */
   guidance: string;
+  /** The Jev score a clip needs to be one of this project's clips, or
+   *  null/absent to follow the application's `jev_min_score`. */
+  jev_min_score?: number | null;
 };
 
 /**
@@ -529,6 +554,15 @@ export type SettingsResponse = {
     // three defaults above this is read when the step runs, so editing it
     // changes what an existing project finds on its next run.
     highlight_defaults?: Partial<HighlightProjectSettings>;
+    // The language the video is in, as a Whisper code, or "auto" to detect it.
+    // Absent means English.
+    transcription_language?: string;
+    // Which model finds the highlights. Jev picks and cuts the clips; Gemini
+    // still writes their titles. Absent means Gemini.
+    highlight_provider?: 'gemini' | 'jev';
+    // Clips scoring under this, relative to their video (0–1), go under "show
+    // more" for every project that has not set its own.
+    jev_min_score?: number;
     // The text and template every project's descriptions start from. Unlike
     // caption defaults these are read at upload time, so editing them changes
     // what existing projects publish.
@@ -548,6 +582,10 @@ export type SettingsResponse = {
     youtube_schedule_day_end_hour?: number;
     postiz_api_key?: string;
     postiz_api_url?: string;
+    // Jev, TypeSafe AI's decision model. The key is a secret like the Gemini
+    // key; the URL is empty unless calls go through a gateway.
+    typesafe_api_key?: string;
+    typesafe_api_url?: string;
     // Which channels an import files against. Empty means nothing is imported:
     // posting somewhere is a decision, not something to infer from an account
     // being connected to Postiz.

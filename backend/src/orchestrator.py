@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from backend.src.dataclasses.data import Project
-from backend.src.infrastructure.progress import reporting_to
+from backend.src.infrastructure.progress import reporting_to, stoppable
 
 from backend.src.services.transcriber import Transcriber
 from backend.src.services.llm_query import LLMQuery
@@ -22,6 +22,10 @@ logger = logging.getLogger(__name__)
 # would finish it is a resume the user asks for by pressing the step, not
 # something to loop on here.
 DONE_STATUSES = ("completed", "partial")
+
+# Appended to a step's process key for the work it left running after it
+# finished (see `_start_background`).
+BACKGROUND_SUFFIX = "_background"
 
 
 class ClipRegenerationInProgressError(Exception):
@@ -48,6 +52,10 @@ class PipelineOrchestrator:
         # project file: it describes this attempt, not the project, and it is
         # worthless the moment the step ends.
         self.step_notes: Dict[str, Dict[str, Any]] = {}
+        # One event per running step, keyed like `active_processes`. Setting it
+        # is how a step is stopped; comparing it is how a stopped run's thread
+        # knows the key now belongs to the run that replaced it.
+        self._run_events: Dict[str, threading.Event] = {}
         self._lock = threading.Lock()
 
         # Injectable services. Every discovered prompt contributes its own
@@ -131,12 +139,14 @@ class PipelineOrchestrator:
             if replace and "replace" in parameters:
                 kwargs["replace"] = True
             if inspect.iscoroutinefunction(service.execute):
-                asyncio.run(service.execute(project, **kwargs))
+                result = asyncio.run(service.execute(project, **kwargs))
             else:
-                service.execute(project, **kwargs)
+                result = service.execute(project, **kwargs)
 
             if project.step_statuses.get(step_name) == "error":
                 raise RuntimeError(f"Service {step_name} failed.")
+            return result
+        return None
 
     def _record_step_failure(self, project_id: str, step_name: str, error: BaseException):
         """Writes why a step stopped, when the step itself never got to say.
@@ -219,8 +229,9 @@ class PipelineOrchestrator:
     def _has_running_step(self, project_id: str) -> bool:
         prefix = f"{project_id}_"
         with self._lock:
+            # Background work is not a step the pipeline could be waiting on.
             return any(
-                key.startswith(prefix) and not key.endswith("_pipeline")
+                key.startswith(prefix) and not key.endswith(("_pipeline", BACKGROUND_SUFFIX))
                 for key in self.active_processes
             )
 
@@ -281,30 +292,110 @@ class PipelineOrchestrator:
             return
 
         project = Project(project_id)
+        # A new run replaces what the last one's background work was filling in.
+        self._stop_background(f"{key}{BACKGROUND_SUFFIX}")
         self._invalidate_dependents(project, step_name)
         # Registered before the thread starts so the request that triggered the
         # step returns with the process already visible on /active_processes.
         # The frontend gates its polling on that list, so a late registration
         # means the UI never starts refreshing.
         self._register_process(key)
+        stop_event = threading.Event()
+        with self._lock:
+            self._run_events[key] = stop_event
 
         def runner():
             try:
                 # Everything this step reports on this thread lands on the
                 # step's own entry, which is what /execution_status hands to
                 # the page while the step runs.
-                with reporting_to(lambda message: self._note_progress(key, message)):
-                    self._exec_service(project, step_name, full=full, replace=replace)
+                with reporting_to(lambda message: self._note_progress(key, message)), stoppable(stop_event):
+                    result = self._exec_service(project, step_name, full=full, replace=replace)
+                # A step may finish with work still to do that nothing waits
+                # for — Jev's titles — and hands it back to run on its own.
+                background = result.get("background") if isinstance(result, dict) else None
+                if callable(background) and not stop_event.is_set():
+                    self._start_background(f"{key}{BACKGROUND_SUFFIX}", background)
             except Exception as e:
-                logger.exception(f"Step {step_name} failed for project {project_id}")
-                self._record_step_failure(project_id, step_name, e)
+                if stop_event.is_set():
+                    logger.info(f"Stopped step {step_name} for project {project_id} ended: {e}")
+                else:
+                    logger.exception(f"Step {step_name} failed for project {project_id}")
+                    self._record_step_failure(project_id, step_name, e)
             finally:
-                self._unregister_process(key)
+                # A stopped run's key may already belong to a new run of the
+                # same step; only the run that still owns it lets it go.
+                with self._lock:
+                    owns_key = self._run_events.get(key) is stop_event
+                    if owns_key:
+                        self._run_events.pop(key, None)
+                if owns_key:
+                    self._unregister_process(key)
 
         thread = threading.Thread(target=runner)
         with self._lock:
             self.active_project_orchestrators[project_id] = thread
         thread.start()
+
+    def _start_background(self, key: str, work) -> None:
+        """Runs work a finished step left behind, on its own thread.
+
+        Registered like a step, so the page keeps polling and shows its results
+        as they land, but under a key that is not a step: nothing waits on it,
+        and the steps after the one that started it are already free to run.
+        """
+        event = threading.Event()
+        with self._lock:
+            self._run_events[key] = event
+        self._register_process(key)
+
+        def runner():
+            try:
+                with stoppable(event):
+                    work()
+            except Exception:
+                logger.exception(f"Background work {key} failed")
+            finally:
+                with self._lock:
+                    owns_key = self._run_events.get(key) is event
+                    if owns_key:
+                        self._run_events.pop(key, None)
+                if owns_key:
+                    self._unregister_process(key)
+
+        threading.Thread(target=runner, daemon=True).start()
+
+    def _stop_background(self, key: str) -> None:
+        with self._lock:
+            event = self._run_events.pop(key, None)
+        if event is not None:
+            event.set()
+            self._unregister_process(key)
+
+    def stop_step(self, project_id: str, step_name: str) -> bool:
+        """Stops a running step, for services that honour a stop. True if it stopped.
+
+        The thread is not killed — Python cannot — but it is told, and it
+        discards whatever it was about to write. The step is released at once,
+        so pressing it again starts a fresh run instead of waiting for the old
+        one's request to come back.
+        """
+        if not getattr(self.services.get(step_name), "supports_stop", False):
+            logger.info(f"Step {step_name} cannot be stopped; ignoring stop for {project_id}")
+            return False
+        key = f"{project_id}_{step_name}"
+        with self._lock:
+            event = self._run_events.pop(key, None)
+        if event is None:
+            return False
+        event.set()
+        self._unregister_process(key)
+        try:
+            Project(project_id).set_step_status(step_name, "pending")
+        except Exception:
+            logger.exception(f"Could not mark {step_name} stopped for project {project_id}")
+        logger.info(f"Stopped step {step_name} for project {project_id}")
+        return True
 
     def upload_clip(self, project_id: str, clip_index: int) -> str:
         """Re-cuts one clip and publishes it in the background; returns its job key.

@@ -79,4 +79,15 @@ describe('SettingsPage secrets', () => {
     await waitFor(() => expect(save).toHaveBeenCalled());
     expect(save.mock.calls[0][0]).toEqual({ settings: { gemini_api_key: '' } });
   });
+
+  it('saves a Jev key the user types', async () => {
+    const save = vi.spyOn(api, 'updateSettings').mockResolvedValue({} as never);
+
+    renderPage();
+    const input = await screen.findByLabelText(/Jev \(TypeSafe\) API Key/i);
+    fireEvent.change(input, { target: { value: 'TS-KEY' } });
+
+    await waitFor(() => expect(save).toHaveBeenCalled());
+    expect(save.mock.calls[0][0]).toEqual({ settings: { typesafe_api_key: 'TS-KEY' } });
+  });
 });

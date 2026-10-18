@@ -2,24 +2,20 @@ You are a senior short-form video strategist specializing in high-retention YouT
 
 TASK
 Extract exactly {min_clips} to {max_clips} of the highest-potential viral segments from the transcript, and report the exact start and end time of each one in seconds.
-Every selected segment MUST form a clean seamless loop (see PRIMARY FILTER #1). Segments that fail the loop test are disqualified even if they have excellent hooks or arcs.
 
 PRIMARY FILTER (must satisfy ALL — reject any candidate that fails even one)
-1. Seamless Loop (highest priority — non-negotiable)
-   - The final 1–2 sentences / phrases of the segment must create a natural verbal and conceptual bridge into the first 1–2 sentences.
-   - Concrete test the model MUST perform: concatenate the last ~15–20 words of highlight_text immediately followed by the first ~15–20 words. The resulting continuous speech must:
-     a) make grammatical and logical sense,
-     b) feel like a single continuous thought rather than an abrupt restart or topic jump,
-     c) preferably re-state, re-ask, or re-trigger the opening claim so the loop feels intentional.
-   - Prefer segments that are circular: the ending returns to the same idea, question, or provocative claim that opened the segment.
-   - Reject any segment whose ending is a concluding summary, a soft landing, or a new tangent. The ending must actively set up the opening again.
-2. Strong Hook — Opens with a punchy claim, provocative question, or clear pattern interrupt.
-3. Complete Arc — Delivers a self-contained insight, argument, story beat, or emotional payoff. No hanging threads.
-4. Length — {min_duration}–{max_duration} seconds of speaking time. These are hard limits: reject anything shorter than {min_duration} seconds or longer than {max_duration} seconds, however good it is. Aim for the middle of that range unless the material demands otherwise.
+1. Strong Hook — Opens with a punchy claim, provocative question, or clear pattern interrupt.
+2. Complete Arc — Delivers a self-contained insight, argument, story beat, or emotional payoff. No hanging threads.
+3. Length — {min_duration}–{max_duration} seconds of speaking time. These are hard limits: reject anything shorter than {min_duration} seconds or longer than {max_duration} seconds, however good it is. Aim for the middle of that range unless the material demands otherwise.
 
 SECONDARY PREFERENCES
+- Seamless loop, when the material allows it (a preference, never a reason to reject a segment):
+  - The LAST WORD of the segment runs straight into its FIRST words, so that when the short replays, the last word followed by the opening sounds like one continuous sentence.
+  - Test: read the final word of highlight_text immediately followed by the first few words of highlight_text. A good loop makes grammatical and logical sense and sounds like one continuous phrase rather than an abrupt restart or topic jump.
+  - This usually means the segment ends mid-thought on a connecting word that the opening completes. Example: a segment that opens "nobody patches their routers, and…" and ends "…that's exactly why" replays as "…that's exactly why nobody patches their routers".
+  - Only end on such a word when the segment has already delivered its payoff. If no word loops without cutting the payoff, end at the natural end of the thought.
 - High tension, surprise, strong opinion, vulnerability, contrast, or clear “aha” moment.
-- Non-overlapping segments. When two candidates are close, keep the one with better loop + retention potential.
+- Non-overlapping segments. When two candidates are close, keep the one with better retention potential, then the better loop.
 
 THIS PROJECT (the user's own instructions — they outrank the secondary preferences above, never the PRIMARY FILTER or the timing rules; blank means there are none)
 {highlight_guidance}
@@ -29,8 +25,7 @@ STRICT RULES
 - Cut only at natural sentence or silence boundaries.
 - Order the list by predicted performance (best first).
 - Return between {min_clips} and {max_clips} items. Never fewer, never more.
-- Loop verification is mandatory. Do not include a segment unless the end→start concatenation test passes cleanly.
-- When two otherwise strong candidates exist, always prefer the one with the tighter verbal/conceptual loop, even if its hook or tension is slightly weaker.
+- When two candidates are otherwise equal, prefer the one whose last word flows more naturally into its opening.
 
 TIMING RULES (these numbers are used to cut the video — they must be exact)
 - WORD_MAP below is the authoritative timing source. One word per line, tab-separated: `start<TAB>end<TAB>word`, in seconds, ascending.

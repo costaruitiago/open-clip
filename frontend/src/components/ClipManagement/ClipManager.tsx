@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Clip } from './Clip';
 import { ClipSkeleton } from './ClipSkeleton';
-import type { ClipPreview } from '../../api';
+import type { ClipPreview, JevScores } from '../../api';
 
 interface ClipRaw {
   /** Position in the project's highlights, assigned where the list is built. */
@@ -27,6 +27,8 @@ interface ClipRaw {
   postizImportedAt?: string | null;
   /** What Postiz has done with it since: published, scheduled, error, or none. */
   postizState?: string | null;
+  /** What Jev answered about this clip, or absent for a clip Gemini picked. */
+  jevScores?: JevScores | null;
   original_start: number;
   original_end: number;
   text: string;
@@ -35,6 +37,12 @@ interface ClipRaw {
 interface ClipManagerProps {
   projectId: string;
   clips: ClipRaw[];
+  /**
+   * Moments a Jev run scored below the project's cutoff. Kept out of the main
+   * grid and behind a "show more" toggle, greyed, but still cards that can be
+   * cut or published one at a time.
+   */
+  belowClips?: ClipRaw[];
   /** The uncut source, previewed inside each highlight's window. */
   sourceUrl: string | null;
   /** Target width / height the clipper would render at, or null for source. */
@@ -45,10 +53,11 @@ interface ClipManagerProps {
   isLoading?: boolean;
 }
 
-const ClipGrid: React.FC<ClipManagerProps> = ({ projectId, clips, sourceUrl, aspectRatio, clipPreview, onDeleteClip, isLoading }) => {
+const ClipGrid: React.FC<ClipManagerProps> = ({ projectId, clips, belowClips = [], sourceUrl, aspectRatio, clipPreview, onDeleteClip, isLoading }) => {
   const [playingClipIndex, setPlayingClipIndex] = useState<number | null>(null);
+  const [showBelow, setShowBelow] = useState(false);
 
-  if (clips.length === 0 && !isLoading) {
+  if (clips.length === 0 && belowClips.length === 0 && !isLoading) {
     return (
       <div style={{
         display: 'flex',
@@ -122,6 +131,48 @@ const ClipGrid: React.FC<ClipManagerProps> = ({ projectId, clips, sourceUrl, asp
         ))}
         {isLoading && <ClipSkeleton />}
       </div>
+
+      {belowClips.length > 0 && (
+        <div style={{ marginTop: 'var(--space-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
+          <button
+            type="button"
+            onClick={() => setShowBelow((open) => !open)}
+            aria-expanded={showBelow}
+            style={{
+              alignSelf: 'flex-start',
+              minHeight: '44px',
+              padding: '0 var(--space-md)',
+              border: 'var(--border)',
+              background: 'transparent',
+              color: 'var(--text)',
+              fontWeight: 900,
+              fontSize: '0.8rem',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+            }}
+          >
+            {showBelow ? 'Hide' : 'Show'} {belowClips.length} lower-scoring clips
+          </button>
+          {showBelow && (
+            <div className="card-grid">
+              {belowClips.map((clip) => (
+                <div key={`${clip.original_start}-${clip.original_end}-${clip.filename ?? 'preview'}`} className="clip-below-cutoff">
+                  <Clip
+                    projectId={projectId}
+                    clip={clip}
+                    sourceUrl={sourceUrl}
+                    aspectRatio={aspectRatio}
+                    clipPreview={clipPreview}
+                    onDelete={onDeleteClip}
+                    playingClipIndex={playingClipIndex}
+                    setPlayingClipIndex={setPlayingClipIndex}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

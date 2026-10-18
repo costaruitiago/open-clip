@@ -26,6 +26,7 @@ from backend.src.dataclasses.data import (
 )
 from backend.src.infrastructure.font_metrics import resolve_face
 from backend.src.registry import list_projects, delete_project
+from backend.src.services import highlight_options
 from backend.src.services.marker_exporter import MarkerExporter, DEFAULT_RECORD_START
 from backend.src.services.chapter_exporter import ChapterExporter, NoChaptersError
 from backend.src.services.ass_writer import render_ass
@@ -447,9 +448,13 @@ class SimpleHandler(BaseHTTPRequestHandler):
         # Merge file statuses with active processes
         statuses = project.step_statuses.copy()
         
-        # Add progress metadata
-        total_clips = len(project.highlights)
-        generated_clips = len([h for h in project.highlights if h.is_clip_generated])
+        # Add progress metadata: of the project's clips only, which is what the
+        # cut step works through — not the lower-scoring moments it skips.
+        selected = highlight_options.selected_indices(project)
+        total_clips = len(selected)
+        generated_clips = len([
+            h for i, h in enumerate(project.highlights) if i in selected and h.is_clip_generated
+        ])
         statuses["progress"] = {"generated": generated_clips, "total": total_clips}
         # What each running step is doing, and since when. A step that reports
         # nothing still gets an entry with `since` in it, which is what lets the
@@ -964,7 +969,11 @@ class SimpleHandler(BaseHTTPRequestHandler):
             # Set when the user chose to regenerate on Upload: every clip is
             # re-cut and its old YouTube video replaced.
             pipeline_orchestrator.run_step(project_id, step, replace=bool(data.get('regenerate')))
-        
+        elif action == 'STOP':
+            stopped = pipeline_orchestrator.stop_step(project_id, step)
+            self.send_json_response({"status": "stopped" if stopped else "not_stoppable"})
+            return
+
         self.send_json_response({"status": "started"})
 
     def handle_post_upload_clip(self):

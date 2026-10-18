@@ -12,7 +12,7 @@ The resolved numbers reach the prompt as `{min_clips}`, `{max_clips}`,
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Optional, Tuple
+from typing import Any, Optional, Set, Tuple
 
 from backend.src.dataclasses.data import (
     HIGHLIGHT_MAX_CLIPS,
@@ -127,6 +127,60 @@ def resolve(project: Optional[Project] = None) -> HighlightOptions:
         max_duration=max(1.0, min(max_duration, HIGHLIGHT_MAX_DURATION)),
         guidance=guidance,
     )
+
+
+# The application's cutoff, which a project follows until it moves its own.
+JEV_MIN_SCORE_KEY = "jev_min_score"
+
+
+def jev_min_score(project: Optional[Project] = None) -> float:
+    """The Jev score a clip needs to count as one of this project's clips."""
+    own = _project_settings(project)
+    value = getattr(own, "jev_min_score", None) if own is not None else None
+    if value is None:
+        value = settings_manager.get(JEV_MIN_SCORE_KEY)
+    try:
+        return min(1.0, max(0.0, float(value or 0.0)))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def jev_display_score(scores: dict) -> Optional[float]:
+    """The score a card shows and the cutoff is compared against.
+
+    The score relative to the video (its best moment 1, its weakest 0), or the
+    raw score for a clip scored before relative scores existed.
+    """
+    relative = scores.get("relative")
+    return relative if isinstance(relative, (int, float)) else scores.get("score")
+
+
+def selected_indices(project: Project) -> Set[int]:
+    """Which highlights are this project's clips, by position.
+
+    A Jev run keeps every moment it scored, so the list holds the clips the
+    user wants and the moments below the cutoff together. The ones scoring at
+    or above the cutoff are the clips, and only those: the cutoff is the whole
+    rule, so a clip under it never appears among them. Steps that work through
+    every clip (cutting, thumbnails, publishing) skip the others; each one can
+    still be cut or published on its own from its card.
+
+    A highlight without a Jev score — every Gemini highlight — is always a clip.
+    The frontend mirrors this in `frontend/src/utils/jevSelection.ts`.
+    """
+    scored = {
+        index: jev_display_score(h.jev_scores)
+        for index, h in enumerate(project.highlights)
+        if isinstance(getattr(h, "jev_scores", None), dict)
+        and isinstance(jev_display_score(h.jev_scores), (int, float))
+    }
+    unscored = {i for i in range(len(project.highlights)) if i not in scored}
+    if not scored:
+        return unscored
+    # Compared as the 0–100 whole numbers the page shows, so a clip labelled
+    # 50 is never on the wrong side of a cutoff of 50.
+    cutoff = round(jev_min_score(project) * 100)
+    return {i for i, score in scored.items() if round(score * 100) >= cutoff} | unscored
 
 
 def format_seconds(value: float) -> str:

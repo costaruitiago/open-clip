@@ -15,6 +15,8 @@ import {
   type StepActivity,
 } from '../../api';
 import { matchesOutputSettings, targetAspectRatio } from '../../utils/aspectRatio';
+import { useClipSelection } from '../../hooks/useClipSelection';
+import { displayScore } from '../../utils/jevSelection';
 import { stepLabel } from '../../utils/stepLabels';
 import { StackLayoutContext, stackLayoutFor } from '../ClipManagement/StackedBands';
 
@@ -182,6 +184,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ metadata, pipeline
         // What the sync last heard. The card offers to import again either way,
         // but a clip that is already out is a duplicate rather than a fix.
         postizState: h.postiz_state ?? null,
+        jevScores: h.jev_scores ?? null,
         original_start: h.start,
         original_end: h.end,
         // The card is named by what the clip would be published as; the hook is
@@ -197,6 +200,20 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ metadata, pipeline
     // rebuild this list — that is the whole point of `outputStale`.
     [displayMetadata.highlights, displayMetadata.settings]
   );
+
+  // Scored highlights split into the project's clips and the lower-scoring
+  // rest, which go behind "show more". The header's clips menu moves the line.
+  // Both lists run from the highest score down.
+  const { selected } = useClipSelection(displayMetadata);
+  const { mainClips, belowClips } = React.useMemo(() => {
+    if (!selected) return { mainClips: clips, belowClips: [] };
+    const byScore = (a: (typeof clips)[number], b: (typeof clips)[number]) =>
+      (displayScore(b.jevScores) ?? 0) - (displayScore(a.jevScores) ?? 0);
+    return {
+      mainClips: clips.filter((c) => selected.has(c.index)).sort(byScore),
+      belowClips: clips.filter((c) => !selected.has(c.index)).sort(byScore),
+    };
+  }, [clips, selected]);
 
   // Memoised for the same reason `clips` is: this page rebuilds twice a second
   // while a step runs, and an array rebuilt inline is a new prop identity on
@@ -284,11 +301,14 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ metadata, pipeline
         <h2 id={clipsHeadingId} className="visually-hidden">Clips</h2>
         {/* Counts clips, so it reads above the clips rather than inside a
             pipeline menu in the header. */}
-        {isActive && clipProgress && clipProgress.total > 0 && <ProgressLine progress={clipProgress} />}
+        {/* Only while clips are actually being cut: other work running for the
+            project (titles filling in, an upload) renders nothing. */}
+        {isClipperRunning && clipProgress && clipProgress.total > 0 && <ProgressLine progress={clipProgress} />}
         <StackLayoutContext.Provider value={stackLayoutFor(displayMetadata.settings)}>
           <ClipManager
             projectId={displayMetadata.project_id}
-            clips={clips}
+            clips={mainClips}
+            belowClips={belowClips}
             sourceUrl={sourceUrl}
             aspectRatio={previewAspectRatio}
             clipPreview={currentClipPreview}

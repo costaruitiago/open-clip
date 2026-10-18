@@ -11,5 +11,8 @@
   "youtube_privacy": "schedule",
   "youtube_schedule_per_day": 1,
   "youtube_schedule_day_start_hour": 6,
-  "youtube_schedule_day_end_hour": 7
+  "youtube_schedule_day_end_hour": 7,
+  "highlight_provider": "jev",
+  "jev_use_guidance": true,
+  "jev_min_score": 0.5
 }

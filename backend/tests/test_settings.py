@@ -109,6 +109,21 @@ def test_set_routes_each_key_to_its_own_file():
         assert manager.get("postiz_comment_template") == "watch here: {project.source_url}"
         assert manager.get("postiz_api_key") == "pk-secret"
 
+
+def test_jev_key_is_a_secret_and_its_url_is_a_user_setting():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_dir = Path(tmpdir)
+        manager = _manager_in(config_dir)
+
+        manager.set("typesafe_api_key", "ts-secret")
+        manager.set("typesafe_api_url", "https://gateway.example.com")
+
+        with open(config_dir / "secrets.json", "r") as f:
+            assert json.load(f)["typesafe_api_key"] == "ts-secret"
+        with open(config_dir / "user_settings.json", "r") as f:
+            assert json.load(f)["typesafe_api_url"] == "https://gateway.example.com"
+        assert manager.get("typesafe_api_key") == "ts-secret"
+
 def test_settings_manager_migrates_existing_secrets_from_settings_json():
     with tempfile.TemporaryDirectory() as tmpdir:
         config_dir = Path(tmpdir)
