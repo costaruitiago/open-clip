@@ -19,13 +19,15 @@ const settings = {
   pipeline_config: { execution_order: [], steps: {} },
 };
 
-const renderPage = () => {
+// Everything covered here lives on the YouTube tab.
+const renderPage = async () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  render(
     <QueryClientProvider client={client}>
       <SettingsPage theme="light" setTheme={() => {}} />
     </QueryClientProvider>
   );
+  fireEvent.click(await screen.findByRole('tab', { name: 'YouTube' }));
 };
 
 beforeEach(() => {
@@ -46,7 +48,7 @@ describe('SettingsPage YouTube channel', () => {
       has_client_secrets: true,
     });
 
-    renderPage();
+    await renderPage();
 
     expect(await screen.findByText(/Connected as someone@example.com/)).toBeInTheDocument();
     expect(screen.getByText(/Missing permission/)).toBeInTheDocument();
@@ -66,7 +68,7 @@ describe('SettingsPage YouTube channel', () => {
       has_client_secrets: true,
     });
 
-    renderPage();
+    await renderPage();
 
     const reason = await screen.findByText(/YouTube has rejected the stored authorisation/);
     expect(reason).toHaveStyle({ color: 'var(--error)' });
@@ -84,7 +86,7 @@ describe('SettingsPage YouTube channel', () => {
       .mockResolvedValue({ authorization_url: 'https://accounts.google.com/o/oauth2/auth?x=1' });
     const open = vi.spyOn(window, 'open').mockReturnValue(null);
 
-    renderPage();
+    await renderPage();
     fireEvent.click(await screen.findByRole('button', { name: /Connect Channel/i }));
 
     await waitFor(() => expect(connect).toHaveBeenCalled());
@@ -111,7 +113,7 @@ describe('SettingsPage YouTube channel', () => {
       .mockResolvedValue({ authorization_url: 'https://accounts.google.com/o/oauth2/auth?x=2' });
     vi.spyOn(window, 'open').mockReturnValue(null);
 
-    renderPage();
+    await renderPage();
     const again = await screen.findByRole('button', { name: /Open Sign-in Again/i });
     expect(again).toBeEnabled();
     fireEvent.click(again);
@@ -127,7 +129,7 @@ describe('SettingsPage YouTube channel', () => {
     });
     const cancel = vi.spyOn(api, 'cancelYoutubeConnect').mockResolvedValue({ status: 'success' });
 
-    renderPage();
+    await renderPage();
     fireEvent.click(await screen.findByRole('button', { name: /^Cancel$/i }));
 
     await waitFor(() => expect(cancel).toHaveBeenCalled());
@@ -144,10 +146,11 @@ describe('SettingsPage YouTube channel', () => {
       has_client_secrets: false,
     });
 
-    renderPage();
+    await renderPage();
 
     expect(await screen.findByRole('button', { name: /Connect Channel/i })).toBeDisabled();
-    expect(screen.getByText(/Add the client secrets above first/)).toBeInTheDocument();
+    expect(screen.getByText(/Add the YouTube client secrets under/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Secrets' })).toBeInTheDocument();
   });
 });
 
@@ -175,9 +178,9 @@ describe('SettingsPage upload privacy', () => {
   });
 
   it('starts on private, which is the one that reaches nobody by accident', async () => {
-    renderPage();
+    await renderPage();
 
-    expect(await screen.findByLabelText(/What an upload makes/)).toHaveValue('private');
+    expect(await screen.findByLabelText(/Privacy/)).toHaveValue('private');
   });
 
   it('asks for a calendar only once the uploads are scheduled', async () => {
@@ -185,12 +188,12 @@ describe('SettingsPage upload privacy', () => {
     // function it was given, so a spy set up afterwards is never called.
     const update = vi.spyOn(api, 'updateSettings').mockResolvedValue({ status: 'success' } as never);
 
-    renderPage();
-    await screen.findByLabelText(/What an upload makes/);
+    await renderPage();
+    await screen.findByLabelText(/Privacy/);
 
-    expect(screen.queryByLabelText(/First clip goes public on/)).toBeNull();
+    expect(screen.queryByLabelText(/Start date/)).toBeNull();
 
-    fireEvent.change(screen.getByLabelText(/What an upload makes/), {
+    fireEvent.change(screen.getByLabelText(/Privacy/), {
       target: { value: 'schedule' },
     });
 
@@ -204,14 +207,14 @@ describe('SettingsPage upload privacy', () => {
     } as never);
     const update = vi.spyOn(api, 'updateSettings').mockResolvedValue({ status: 'success' } as never);
 
-    renderPage();
+    await renderPage();
 
-    fireEvent.change(await screen.findByLabelText(/First clip goes public on/), {
+    fireEvent.change(await screen.findByLabelText(/Start date/), {
       target: { value: '2026-09-01' },
     });
     await saved(update, { youtube_schedule_start_date: '2026-09-01' });
 
-    fireEvent.change(screen.getByLabelText(/How many go public per day/), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText(/Per day/), { target: { value: '2' } });
     await saved(update, { youtube_schedule_per_day: 2 });
 
     // Nine to nine unless somebody says otherwise, and picked on this

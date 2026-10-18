@@ -20,13 +20,15 @@ const stored = {
   pipeline_config: { execution_order: [], steps: {} },
 };
 
-const renderPage = () => {
+// The keys live on the Secrets tab.
+const renderPage = async () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  render(
     <QueryClientProvider client={client}>
       <SettingsPage theme="light" setTheme={() => {}} />
     </QueryClientProvider>
   );
+  fireEvent.click(await screen.findByRole('tab', { name: 'Secrets' }));
 };
 
 // Longer than the 500ms debounce, so a save that was going to happen has.
@@ -49,7 +51,7 @@ describe('SettingsPage secrets', () => {
   it('leaves the stored keys alone when the page is only opened', async () => {
     const save = vi.spyOn(api, 'updateSettings').mockResolvedValue({} as never);
 
-    renderPage();
+    await renderPage();
     expect(await screen.findByLabelText(/Gemini API Key/i)).toHaveValue('STORED-KEY');
     await pastDebounce();
 
@@ -59,7 +61,7 @@ describe('SettingsPage secrets', () => {
   it('saves a key the user types', async () => {
     const save = vi.spyOn(api, 'updateSettings').mockResolvedValue({} as never);
 
-    renderPage();
+    await renderPage();
     const input = await screen.findByLabelText(/Gemini API Key/i);
     fireEvent.change(input, { target: { value: 'NEW-KEY' } });
 
@@ -72,7 +74,7 @@ describe('SettingsPage secrets', () => {
   it('saves the empty box when the user clears the key themselves', async () => {
     const save = vi.spyOn(api, 'updateSettings').mockResolvedValue({} as never);
 
-    renderPage();
+    await renderPage();
     const input = await screen.findByLabelText(/Gemini API Key/i);
     fireEvent.change(input, { target: { value: '' } });
 
@@ -83,7 +85,7 @@ describe('SettingsPage secrets', () => {
   it('saves a Jev key the user types', async () => {
     const save = vi.spyOn(api, 'updateSettings').mockResolvedValue({} as never);
 
-    renderPage();
+    await renderPage();
     const input = await screen.findByLabelText(/Jev \(TypeSafe\) API Key/i);
     fireEvent.change(input, { target: { value: 'TS-KEY' } });
 
