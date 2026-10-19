@@ -13,29 +13,11 @@ import {
   type ProjectMetadata,
   type StepActivity,
 } from '../../api';
-import { matchesOutputSettings, targetAspectRatio } from '../../utils/aspectRatio';
+import { targetAspectRatio } from '../../utils/aspectRatio';
 import { useClipSelection } from '../../hooks/useClipSelection';
 import { displayScore } from '../../utils/jevSelection';
 import { stepLabel } from '../../utils/stepLabels';
 import { StackLayoutContext, stackLayoutFor } from '../ClipManagement/StackedBands';
-
-/**
- * How far into the clips a run has got.
- *
- * Accent, not muted grey: this is the pipeline running, which is what accent
- * means in the step row above it. It is also the only line on the page that
- * changes by itself, and it used to be the same colour as the labels that do
- * not.
- */
-const ProgressLine: React.FC<{ progress: { generated: number; total: number } }> = ({ progress }) => (
-  <p
-    role="status"
-    aria-live="polite"
-    style={{ margin: 'var(--space-sm) 0 0 0', fontSize: '0.8rem', color: 'var(--text-accent)', fontWeight: 700 }}
-  >
-    Rendered {progress.generated} of {progress.total} clips
-  </p>
-);
 
 interface ProjectDetailProps {
   metadata: ProjectMetadata;
@@ -65,7 +47,6 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ metadata, pipeline
   // Only poll while this project actually has a process running. Previously
   // this refetched every 2s for as long as the page was open.
   const isActive = activeProcesses.some((processId) => processId.startsWith(`${metadata.project_id}_`));
-  const isClipperRunning = activeProcesses.includes(`${metadata.project_id}_clipper`);
 
   const { data: allStatuses } = useQuery({
     queryKey: ['executionStatus', metadata.project_id],
@@ -104,14 +85,8 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ metadata, pipeline
     }
   }, [postizSync, metadata.project_id, queryClient]);
 
-  // execution_status carries a `progress` object alongside the per-step
-  // strings, which is the only per-clip feedback available during a run.
-  const clipProgress = allStatuses?.progress as unknown as
-    | { generated: number; total: number }
-    | undefined;
-
-  // Same shape of cast: what each running step is doing, and the backend's own
-  // clock to measure it against.
+  // execution_status carries these alongside the per-step strings: what each
+  // running step is doing, and the backend's own clock to measure it against.
   const activity = allStatuses?.activity as unknown as
     | Record<string, StepActivity>
     | undefined;
@@ -133,8 +108,8 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ metadata, pipeline
   const highlightCount = displayMetadata.highlights?.length ?? 0;
   const hasHighlights = highlightCount > 0;
 
-  // Every highlight is a card from the moment the highlights step finishes;
-  // the clipper only swaps a preview for a rendered file.
+  // Every highlight is a card from the moment the highlights step finishes,
+  // and the card is always the preview; the cut file is only for publishing.
   //
   // Memoised because this page polls twice a second while a step runs. Rebuilt
   // inline, the array and every object in it were new identities on each tick,
@@ -143,25 +118,6 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ metadata, pipeline
     () =>
       (displayMetadata.highlights ?? []).map((h: Highlight, index: number) => ({
         index,
-        filename: h.generated_clip_filename ?? null,
-        isRendered: !!h.is_clip_generated,
-        // Whether the file already carries captions decides whether the card
-        // draws them over it or leaves them to the pixels.
-        captionsBurned: !!h.captions_burned,
-        // Same for the overlay title, which is burned on its own schedule: a
-        // clip cut before it was written carries the words and not the title.
-        overlayBurned: !!h.overlay_burned,
-        // A re-cut clip keeps its filename, so the card needs this to stop
-        // playing the copy the browser already has.
-        renderedAt: h.rendered_at ?? null,
-        // A trim moves the window without touching the file, so the card needs
-        // both stamps to say whether the cut still matches its own timecodes.
-        trimmedAt: h.trimmed_at ?? null,
-        // Changing the project's aspect ratio re-shapes the preview and re-cuts
-        // nothing, so a card whose file was made for the old shape has to go
-        // back to previewing from the source rather than present the old crop
-        // as the finished clip.
-        outputStale: !matchesOutputSettings(displayMetadata.settings, h),
         // A published clip is not republished by accident: the card says it is
         // live, and its upload button asks before adding a second video.
         youtubeUrl: h.youtube_url ?? null,
@@ -188,9 +144,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ metadata, pipeline
         // string. `any` on this map hid the mismatch.
         text: h.highlight_text ?? '',
       })),
-    // The output settings are read per clip here, so a change to them has to
-    // rebuild this list — that is the whole point of `outputStale`.
-    [displayMetadata.highlights, displayMetadata.settings]
+    [displayMetadata.highlights]
   );
 
   // Scored highlights split into the project's clips and the lower-scoring
@@ -214,10 +168,10 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ metadata, pipeline
   // change perhaps four times over a whole pipeline.
   //
   // Keyed on the statuses themselves rather than on the object that carries
-  // them: `execution_status` also carries the per-clip `progress` counter,
-  // which ticks on every single poll, so depending on the query object would
-  // rebuild this list forty times for a run in which the statuses changed
-  // three times.
+  // them: `execution_status` also carries the running steps' activity and the
+  // server clock, which change on every single poll, so depending on the query
+  // object would rebuild this list forty times for a run in which the statuses
+  // changed three times.
   const statusKey = (pipelineConfig?.execution_order || [])
     .map((stepName) => {
       const status = allStatuses?.[stepName] ?? 'locked';
@@ -291,11 +245,6 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ metadata, pipeline
           still previews from the source; it just no longer plays it twice. */}
       <section aria-labelledby={clipsHeadingId} className="project-clips">
         <h2 id={clipsHeadingId} className="visually-hidden">Clips</h2>
-        {/* Counts clips, so it reads above the clips rather than inside a
-            pipeline menu in the header. */}
-        {/* Only while clips are actually being cut: other work running for the
-            project (titles filling in, an upload) renders nothing. */}
-        {isClipperRunning && clipProgress && clipProgress.total > 0 && <ProgressLine progress={clipProgress} />}
         <StackLayoutContext.Provider value={stackLayoutFor(displayMetadata.settings)}>
           <ClipManager
             projectId={displayMetadata.project_id}
@@ -304,7 +253,6 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ metadata, pipeline
             sourceUrl={sourceUrl}
             aspectRatio={previewAspectRatio}
             onDeleteClip={onDeleteClip}
-            isLoading={isClipperRunning}
           />
         </StackLayoutContext.Provider>
       </section>

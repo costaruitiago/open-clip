@@ -52,19 +52,21 @@ def project_root(tmp_path, monkeypatch):
     return tmp_path
 
 
-def make_orchestrator(services):
-    return PipelineOrchestrator(config_path=str(PIPELINE_CONFIG), services=services)
+def make_orchestrator(services, clipper=None):
+    return PipelineOrchestrator(
+        config_path=str(PIPELINE_CONFIG), services=services, clipper=clipper or RecordingService()
+    )
 
 
 def test_run_step_registers_process_before_returning(project_root):
     service = BlockingService()
-    orchestrator = make_orchestrator({"clipper": service})
+    orchestrator = make_orchestrator({"upload": service})
 
-    orchestrator.run_step(PROJECT_ID, "clipper")
+    orchestrator.run_step(PROJECT_ID, "upload")
 
     # The frontend gates its polling on this list, so the key has to be there
     # by the time the triggering request returns, not once the thread starts.
-    assert f"{PROJECT_ID}_clipper" in orchestrator.active_processes
+    assert f"{PROJECT_ID}_upload" in orchestrator.active_processes
 
     service.release.set()
     orchestrator.active_project_orchestrators[PROJECT_ID].join(timeout=5)
@@ -76,16 +78,16 @@ def test_run_step_registers_process_before_returning(project_root):
 # carries the difference to the page.
 def test_a_running_step_reports_how_long_it_has_been_going(project_root):
     service = BlockingService()
-    orchestrator = make_orchestrator({"clipper": service})
+    orchestrator = make_orchestrator({"upload": service})
 
-    orchestrator.run_step(PROJECT_ID, "clipper")
+    orchestrator.run_step(PROJECT_ID, "upload")
     assert service.started.wait(timeout=5)
 
     activity = orchestrator.activity(PROJECT_ID)
     # Present before anything has been reported: the elapsed time is already
     # more than "running" said.
-    assert "since" in activity["clipper"]
-    assert "message" not in activity["clipper"]
+    assert "since" in activity["upload"]
+    assert "message" not in activity["upload"]
 
     service.release.set()
     orchestrator.active_project_orchestrators[PROJECT_ID].join(timeout=5)
@@ -103,12 +105,12 @@ def test_what_a_step_reports_reaches_the_page(project_root):
             self.release.wait(timeout=5)
 
     service = TalkingService()
-    orchestrator = make_orchestrator({"clipper": service})
+    orchestrator = make_orchestrator({"upload": service})
 
-    orchestrator.run_step(PROJECT_ID, "clipper")
+    orchestrator.run_step(PROJECT_ID, "upload")
     assert service.started.wait(timeout=5)
 
-    assert orchestrator.activity(PROJECT_ID)["clipper"]["message"] == "Waiting for model-a to answer."
+    assert orchestrator.activity(PROJECT_ID)["upload"]["message"] == "Waiting for model-a to answer."
 
     service.release.set()
     orchestrator.active_project_orchestrators[PROJECT_ID].join(timeout=5)
@@ -132,9 +134,9 @@ def test_run_step_clears_process_when_service_raises(project_root):
         def execute(self, project):
             raise RuntimeError("boom")
 
-    orchestrator = make_orchestrator({"clipper": FailingService()})
+    orchestrator = make_orchestrator({"upload": FailingService()})
 
-    orchestrator.run_step(PROJECT_ID, "clipper")
+    orchestrator.run_step(PROJECT_ID, "upload")
     orchestrator.active_project_orchestrators[PROJECT_ID].join(timeout=5)
 
     assert orchestrator.active_processes == {}
@@ -147,14 +149,14 @@ def test_a_step_that_dies_says_why_on_the_project(project_root):
         def execute(self, project):
             raise RuntimeError("YouTube has rejected the stored authorisation.")
 
-    orchestrator = make_orchestrator({"clipper": FailingService()})
+    orchestrator = make_orchestrator({"upload": FailingService()})
 
-    orchestrator.run_step(PROJECT_ID, "clipper")
+    orchestrator.run_step(PROJECT_ID, "upload")
     orchestrator.active_project_orchestrators[PROJECT_ID].join(timeout=5)
 
     metadata = json.loads((project_root / "projects" / PROJECT_ID / "metadata.json").read_text())
-    assert metadata["step_statuses"]["clipper"] == "error"
-    assert metadata["step_errors"]["clipper"] == "YouTube has rejected the stored authorisation."
+    assert metadata["step_statuses"]["upload"] == "error"
+    assert metadata["step_errors"]["upload"] == "YouTube has rejected the stored authorisation."
 
 
 def test_a_failure_carrying_no_message_is_named_by_its_type(project_root):
@@ -162,13 +164,13 @@ def test_a_failure_carrying_no_message_is_named_by_its_type(project_root):
         def execute(self, project):
             raise TimeoutError()
 
-    orchestrator = make_orchestrator({"clipper": FailingService()})
+    orchestrator = make_orchestrator({"upload": FailingService()})
 
-    orchestrator.run_step(PROJECT_ID, "clipper")
+    orchestrator.run_step(PROJECT_ID, "upload")
     orchestrator.active_project_orchestrators[PROJECT_ID].join(timeout=5)
 
     metadata = json.loads((project_root / "projects" / PROJECT_ID / "metadata.json").read_text())
-    assert metadata["step_errors"]["clipper"] == "TimeoutError"
+    assert metadata["step_errors"]["upload"] == "TimeoutError"
 
 
 def test_a_service_that_reported_its_own_reason_keeps_it(project_root):
@@ -176,24 +178,24 @@ def test_a_service_that_reported_its_own_reason_keeps_it(project_root):
 
     class PartlyFailingService:
         def execute(self, project):
-            project.fail_step("clipper", "3 of 10 clips could not be cut: the source is gone.")
+            project.fail_step("upload", "3 of 10 clips could not be cut: the source is gone.")
 
-    orchestrator = make_orchestrator({"clipper": PartlyFailingService()})
+    orchestrator = make_orchestrator({"upload": PartlyFailingService()})
 
-    orchestrator.run_step(PROJECT_ID, "clipper")
+    orchestrator.run_step(PROJECT_ID, "upload")
     orchestrator.active_project_orchestrators[PROJECT_ID].join(timeout=5)
 
     metadata = json.loads((project_root / "projects" / PROJECT_ID / "metadata.json").read_text())
-    assert metadata["step_errors"]["clipper"] == "3 of 10 clips could not be cut: the source is gone."
+    assert metadata["step_errors"]["upload"] == "3 of 10 clips could not be cut: the source is gone."
 
 
 def test_run_step_ignores_duplicate_trigger_while_running(project_root):
     service = BlockingService()
-    orchestrator = make_orchestrator({"clipper": service})
+    orchestrator = make_orchestrator({"upload": service})
 
-    orchestrator.run_step(PROJECT_ID, "clipper")
+    orchestrator.run_step(PROJECT_ID, "upload")
     assert service.started.wait(timeout=5)
-    orchestrator.run_step(PROJECT_ID, "clipper")
+    orchestrator.run_step(PROJECT_ID, "upload")
 
     service.release.set()
     orchestrator.active_project_orchestrators[PROJECT_ID].join(timeout=5)
@@ -257,7 +259,7 @@ def read_statuses(root: Path) -> dict:
 
 
 def test_rerunning_a_step_resets_everything_downstream(project_root):
-    """Re-running highlights must not leave the clipper showing "done".
+    """Re-running highlights must not leave the upload showing "done".
 
     Every clip is cut from the highlight list this step is about to replace, so
     those clips stop existing the moment highlights re-runs.
@@ -266,13 +268,11 @@ def test_rerunning_a_step_resets_everything_downstream(project_root):
     upload = RecordingService()
     orchestrator = make_orchestrator({
         "highlights": RecordingService(),
-        "clipper": clipper,
         "upload": upload,
-    })
+    }, clipper=clipper)
     write_statuses(project_root, {
         "transcription": "completed",
         "highlights": "completed",
-        "clipper": "completed",
         "upload": "completed",
     })
 
@@ -280,25 +280,35 @@ def test_rerunning_a_step_resets_everything_downstream(project_root):
     orchestrator.active_project_orchestrators[PROJECT_ID].join(timeout=5)
 
     statuses = read_statuses(project_root)
-    # Both are cut from the highlight list this step replaces, so both are stale.
-    assert statuses["clipper"] == "todo"
+    # Published from the highlight list this step replaces, so it is stale.
     assert statuses["upload"] == "todo"
     # Untouched: transcription is what highlights reads, not what it feeds.
     assert statuses["transcription"] == "completed"
+    # The clips on disk were cut from the old list.
     assert clipper.reset_calls == 1
     assert upload.reset_calls == 1
 
 
 def test_rerunning_a_step_leaves_downstream_steps_that_never_ran(project_root):
-    clipper = RecordingService()
-    orchestrator = make_orchestrator({"highlights": RecordingService(), "clipper": clipper})
+    upload = RecordingService()
+    orchestrator = make_orchestrator({"highlights": RecordingService(), "upload": upload})
     write_statuses(project_root, {"transcription": "completed", "highlights": "completed"})
 
     orchestrator.run_step(PROJECT_ID, "highlights")
     orchestrator.active_project_orchestrators[PROJECT_ID].join(timeout=5)
 
-    # Nothing to invalidate: wiping the clips directory of a step that has no
-    # output is pure risk.
+    # Nothing to invalidate: a step that never ran has no output to reset.
+    assert upload.reset_calls == 0
+
+
+def test_a_step_after_highlights_leaves_the_clips_alone(project_root):
+    clipper = RecordingService()
+    orchestrator = make_orchestrator({"upload": RecordingService()}, clipper=clipper)
+    write_statuses(project_root, {"transcription": "completed", "highlights": "completed"})
+
+    orchestrator.run_step(PROJECT_ID, "upload")
+    orchestrator.active_project_orchestrators[PROJECT_ID].join(timeout=5)
+
     assert clipper.reset_calls == 0
 
 
@@ -319,14 +329,14 @@ def test_a_step_pressed_on_its_own_resumes(project_root):
     # The clips already cut, the videos already published and the drafts
     # already filed are the point of pressing it again: it finishes the job
     # rather than repeating it.
-    clipper = ResumableService()
-    orchestrator = make_orchestrator({"clipper": clipper})
+    upload = ResumableService()
+    orchestrator = make_orchestrator({"upload": upload})
     write_statuses(project_root, {"transcription": "completed", "highlights": "completed"})
 
-    orchestrator.run_step(PROJECT_ID, "clipper")
+    orchestrator.run_step(PROJECT_ID, "upload")
     orchestrator.active_project_orchestrators[PROJECT_ID].join(timeout=5)
 
-    assert clipper.full_calls == [False]
+    assert upload.full_calls == [False]
 
 
 def test_the_whole_pipeline_run_starts_from_nothing(project_root):
@@ -358,10 +368,10 @@ def test_a_service_whose_execute_takes_only_a_project_is_not_handed_the_flag(pro
     # keyword they never declared would be a TypeError on every run — swallowed
     # by the thread's own except, so the step would just silently never happen.
     plain = PlainService()
-    orchestrator = make_orchestrator({"clipper": plain})
+    orchestrator = make_orchestrator({"upload": plain})
     write_statuses(project_root, {"transcription": "completed", "highlights": "completed"})
 
-    orchestrator.run_step(PROJECT_ID, "clipper", full=True)
+    orchestrator.run_step(PROJECT_ID, "upload", full=True)
     orchestrator.active_project_orchestrators[PROJECT_ID].join(timeout=5)
 
     assert plain.calls == 1
@@ -471,13 +481,13 @@ def test_a_new_run_stops_the_last_runs_background_work(project_root):
 
 def test_a_step_that_cannot_stop_is_left_running(project_root):
     service = BlockingService()
-    orchestrator = make_orchestrator({"clipper": service})
+    orchestrator = make_orchestrator({"upload": service})
     write_statuses(project_root, {"transcription": "completed", "highlights": "completed"})
-    orchestrator.run_step(PROJECT_ID, "clipper")
+    orchestrator.run_step(PROJECT_ID, "upload")
     service.started.wait(timeout=5)
 
-    assert orchestrator.stop_step(PROJECT_ID, "clipper") is False
-    assert f"{PROJECT_ID}_clipper" in orchestrator.active_processes
+    assert orchestrator.stop_step(PROJECT_ID, "upload") is False
+    assert f"{PROJECT_ID}_upload" in orchestrator.active_processes
 
     service.release.set()
     orchestrator.active_project_orchestrators[PROJECT_ID].join(timeout=5)

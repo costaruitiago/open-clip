@@ -328,10 +328,6 @@ class Highlight:
     # with two different groups, so what identifies this clip's posts is the
     # per-channel ids in `postiz_channels`, not this.
     postiz_group: Optional[str] = None
-    # Whether the rendered file has captions in its pixels. The preview overlay
-    # keys off this: drawing captions over a clip that already has them burned
-    # in would show every word twice.
-    captions_burned: bool = False
     # Caption settings belonging to this clip alone, or None to follow the
     # project. None is the locked state: the clip has no opinion and inherits
     # whatever the project currently says, including later changes to it.
@@ -340,30 +336,12 @@ class Highlight:
     # The title drawn over this clip, or None for a clip that has never had one.
     # Per clip rather than per project: it is text about this moment.
     overlay: Optional[OverlayText] = None
-    # Whether the rendered file already has the overlay in its pixels, the same
-    # promise `captions_burned` makes about the captions. The preview draws the
-    # overlay only while this is false, so a re-render does not show it twice.
-    overlay_burned: bool = False
-    # When the file on disk was last written. The filename does not change
-    # between renders, so this is what a browser cache is busted with after a
-    # clip is regenerated.
+    # When the file on disk was last written. A Postiz draft filed before this
+    # is out of date and is filed again.
     rendered_at: Optional[str] = None
-    # The output geometry the file on disk was actually cut with. Changing the
-    # project's aspect ratio or resolution re-shapes every clip without touching
-    # a file, so without these a card boxed to the new shape goes on playing a
-    # cut made for the old one — a crop nobody asked for, presented as the
-    # finished clip. None means a file cut before this was recorded, which reads
-    # as "matches" rather than as stale.
-    rendered_aspect_ratio: Optional[str] = None
-    rendered_resolution: Optional[str] = None
-    # The layout the file was cut with, for the same reason. None is a file cut
-    # before layouts existed, which was always a crop.
-    rendered_layout: Optional[str] = None
     # When somebody last moved this clip's start or end, or None for a window
-    # nobody has touched. Kept because a trim does not re-cut anything: the file
-    # on disk still holds the old window, and a card showing the new timecodes
-    # over the old footage is a lie the user has no way to spot. Later than
-    # `rendered_at` is what "this clip needs cutting again" means.
+    # nobody has touched. A re-run of the highlights step leaves a trimmed
+    # window alone.
     trimmed_at: Optional[str] = None
     # What Jev answered about this clip when Jev picked it — hook, arc, the
     # combined score, and the loop probability with whether the cut used it —
@@ -424,9 +402,6 @@ class Highlight:
             postiz_state=data.get("postiz_state"),
             postiz_synced_at=data.get("postiz_synced_at"),
             postiz_group=data.get("postiz_group"),
-            # Clips cut before captions existed have none burned in, which is
-            # exactly what the default says.
-            captions_burned=data.get("captions_burned", False),
             # Absent or null means locked to the project, which is what every
             # highlight written before this field existed will say.
             captions=(
@@ -441,14 +416,7 @@ class Highlight:
                 if isinstance(data.get("overlay"), dict)
                 else None
             ),
-            overlay_burned=data.get("overlay_burned", False),
             rendered_at=data.get("rendered_at"),
-            # Absent for every clip cut before the geometry was recorded, which
-            # is read as matching the current settings: the alternative is
-            # declaring every already-rendered clip in every project stale.
-            rendered_aspect_ratio=data.get("rendered_aspect_ratio"),
-            rendered_resolution=data.get("rendered_resolution"),
-            rendered_layout=data.get("rendered_layout"),
             # Absent for every clip whose window is still the one the model
             # picked, which is every clip written before trimming existed.
             trimmed_at=data.get("trimmed_at"),

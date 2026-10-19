@@ -32,7 +32,8 @@ class ClipRegenerationInProgressError(Exception):
 
 
 class PipelineOrchestrator:
-    def __init__(self, config_path: str = "backend/config/pipeline.json", active_processes: Dict[str, Any] = None, services: Dict[str, Any] = None):
+    def __init__(self, config_path: str = "backend/config/pipeline.json", active_processes: Dict[str, Any] = None, services: Dict[str, Any] = None,
+                 clipper: Optional[Clipper] = None):
         self.config_path = Path(config_path)
         self.llm_tasks = discover_tasks()
         self.pipeline_config = self._load_pipeline_config()
@@ -52,22 +53,16 @@ class PipelineOrchestrator:
         # Injectable services. Every discovered prompt contributes its own
         # LLMQuery, so a new prompt file needs no wiring here.
         self.services = services or self._build_services()
+        # Not a step: clips are cut by the upload and the Postiz import on their
+        # way out. Kept here for the clip page's per-clip re-cut, and to clear
+        # the clips when the highlights they were cut from are replaced.
+        self.clipper = clipper or Clipper()
 
     def _build_services(self) -> Dict[str, Any]:
-        postiz = PostizPublisher()
         services: Dict[str, Any] = {
             "transcription": Transcriber(),
-            # Each clip is handed to Postiz the moment its file exists, rather
-            # than waiting for the whole step to finish. A project of twenty
-            # clips is twenty minutes of encoding, and there is no reason the
-            # first clip's draft should wait for the twentieth clip's encode.
-            #
-            # Wired here because this is the one place that knows about both:
-            # the clipper takes a callback and never learns what Postiz is, and
-            # the publisher decides for itself whether it is configured to act.
-            "clipper": Clipper(on_clip_rendered=postiz.import_rendered),
             "upload": Uploader(),
-            "postiz": postiz,
+            "postiz": PostizPublisher(),
         }
         for name, task in self.llm_tasks.items():
             services[name] = LLMQuery(task_name=name, task=task)
@@ -242,9 +237,11 @@ class PipelineOrchestrator:
 
         Re-running highlights replaces the list every clip was cut from, so the
         clips on disk belong to highlights that no longer exist. Without this
-        the clipper keeps its "completed" badge while its output has silently
+        the upload keeps its "completed" badge for videos of moments that are
         gone, and the orphaned files stay in clips/ forever.
         """
+        if step_name == "highlights" or "highlights" in self._dependents(step_name):
+            self.clipper.reset_metadata(project)
         for name in self._dependents(step_name):
             if f"{project.project_id}_{name}" in self.active_processes:
                 # Already running: it will write its own status, and resetting
@@ -556,14 +553,9 @@ class PipelineOrchestrator:
                 )
             self.active_processes[key] = time.time()
 
-        clipper = self.services.get("clipper")
-        if clipper is None:
-            self._unregister_process(key)
-            raise RuntimeError("No clipper service is configured.")
-
         def runner():
             try:
-                clipper.render_one(project, clip_index)
+                self.clipper.render_one(project, clip_index)
             except Exception:
                 logger.exception(f"Regenerating clip {clip_index} failed for project {project_id}")
             finally:
@@ -580,6 +572,7 @@ class PipelineOrchestrator:
         for service in self.services.values():
             if hasattr(service, 'reset_metadata'):
                 service.reset_metadata(project)
+        self.clipper.reset_metadata(project)
 
         pipeline_key = f"{project_id}_pipeline"
         self._register_process(pipeline_key)

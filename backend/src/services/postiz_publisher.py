@@ -668,9 +668,8 @@ class PostizPublisher:
 
         Keyed on the clip's own position rather than on the order things
         happened in, so the same clip lands on the same slot whichever way it
-        was imported: the whole-project step, the clipper handing clips over as
-        it cuts them, or one button on one card. Re-importing a clip moves it
-        nowhere.
+        was imported: the whole-project step or one button on one card.
+        Re-importing a clip moves it nowhere.
         """
         first_hour, last_hour = self._day_window(project)
         # The same arithmetic, the same questions and the same clock the YouTube
@@ -1096,9 +1095,8 @@ class PostizPublisher:
         project's aspect ratio — and a file cut before the last of those changes
         is a different clip.
 
-        `render` is only false when the caller has just cut the clip itself —
-        the clipper handing over a file it wrote a moment ago. Cutting it again
-        there would encode the same clip twice for one import.
+        `render` is only false when the caller has just cut the clip itself.
+        Cutting it again there would encode the same clip twice for one import.
 
         Raises IndexError for a position with no highlight, NoPostizChannelsError
         when the account has nowhere to file it, whatever the render raised when
@@ -1165,65 +1163,14 @@ class PostizPublisher:
         self._record_import(project, index, result)
         return result
 
-    def is_enabled(self) -> bool:
-        """Whether a freshly cut clip should be filed without being asked.
-
-        Two things have to be true: Postiz has to be configured at all, and the
-        user has to want clips filed as they are cut rather than in one pass at
-        the end. Default on, because a configured Postiz is a Postiz somebody
-        set up in order to send things to it — and a clip that is ready an hour
-        before the drafts appear helped nobody.
-        """
-        if not str(self._setting("postiz_api_key", "") or "").strip():
-            return False
-        return self._setting("postiz_import_on_render", True) is not False
-
-    def import_rendered(self, project: Project, index: int) -> Optional[Dict[str, Any]]:
-        """Files a clip the clipper has just finished cutting.
-
-        This is what makes the first clip reach Postiz while the twentieth is
-        still encoding, instead of every clip waiting for the whole step. The
-        file is on disk and current — it was written a second ago — so nothing
-        is re-cut.
-
-        Returns None when Postiz is not set up for this, which is not a
-        failure: it is the ordinary state of a project whose owner does not use
-        it. Failures are recorded on the clip and swallowed, because the clip
-        itself is fine and the run that produced it must not be failed by a
-        scheduler being down.
-        """
-        if not self.is_enabled():
-            return None
-
-        try:
-            client = self.client_factory()
-            channels = self.resolve_channels(client, project)
-        except Exception as e:
-            message = str(e) or e.__class__.__name__
-            logger.warning(f"Not filing clip {index} of {project.project_id}: {message}")
-            self.record_failure(project, index, message)
-            return None
-
-        report(f"Clip {index + 1}: sending to Postiz")
-        try:
-            result = self.import_one(
-                project, index, client=client, channels=channels, render=False
-            )
-        except Exception as e:
-            message = str(e) or e.__class__.__name__
-            logger.warning(f"Could not file clip {index} of {project.project_id}: {message}")
-            self.record_failure(project, index, message)
-            return None
-        return result
-
     def is_current(self, highlight: Highlight) -> bool:
         """Whether this clip's draft is of the file that is on disk now.
 
         A clip filed and then re-cut has a draft carrying the previous video, so
         it is not current and is worth filing again. A clip filed after its last
         cut is done, and re-filing it only puts a second identical draft on the
-        calendar — which is what a run of the step after a run of the clipper
-        would otherwise do to every clip in the project.
+        calendar — which is what a second run of the step would otherwise do to
+        every clip in the project.
         """
         if not highlight.postiz_imported_at:
             return False
@@ -1280,9 +1227,8 @@ class PostizPublisher:
         skipped = 0
         for number, index in enumerate(selected, 1):
             if self.is_current(project.highlights[index]):
-                # Already filed since it was last cut — by the clipper handing
-                # it over as it finished, most often. Filing it again would put
-                # a second identical draft on the calendar.
+                # Already filed since it was last cut. Filing it again would
+                # put a second identical draft on the calendar.
                 skipped += 1
                 continue
             # The one thing the page can say about a step that spends minutes

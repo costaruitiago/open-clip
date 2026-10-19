@@ -192,29 +192,8 @@ export type Highlight = {
   video_description_for_reddit?: string;
   video_description_for_linkedin?: string;
   is_clip_generated?: boolean;
-  generated_clip_filename?: string | null;
-  /** True when the file's own pixels already carry the captions. */
-  captions_burned?: boolean;
   /** The title drawn over this clip, or null/absent for a clip with none. */
   overlay?: OverlayText | null;
-  /** True when the file's own pixels already carry that title. */
-  overlay_burned?: boolean;
-  /** When the file was last written. The filename never changes, so this is
-   *  what tells a browser holding the previous cut that there is a new one. */
-  rendered_at?: string | null;
-  /** The output settings the file was cut with, or absent for one cut before
-   *  they were recorded. Changing the project's aspect ratio or resolution
-   *  re-cuts nothing, so these are what say whether the file on disk is still
-   *  the shape the project now asks for. */
-  rendered_aspect_ratio?: string | null;
-  rendered_resolution?: string | null;
-  /** The layout the file was cut with, or absent for one cut before layouts
-   *  existed — which was always a crop. */
-  rendered_layout?: Layout | null;
-  /** When the window was last moved, or absent for one nobody has trimmed. A
-   *  trim re-cuts nothing, so a stamp later than `rendered_at` means the file
-   *  on disk still holds the window before the edit. */
-  trimmed_at?: string | null;
   /** What Jev answered about this clip, or absent for a clip Gemini picked. */
   jev_scores?: JevScores | null;
   /** Where this clip was published, once it has been uploaded to YouTube. */
@@ -507,9 +486,6 @@ export type SettingsResponse = {
     postiz_channel_settings?: Record<string, Record<string, string>>;
     // What an import makes. `draft` — the default — reaches nobody.
     postiz_post_type?: 'draft' | 'schedule' | 'now';
-    // Whether each clip is filed the moment the clipper finishes cutting it,
-    // rather than in one pass at the end of the project. Default on.
-    postiz_import_on_render?: boolean;
     postiz_schedule_offset_minutes?: number;
     // How many clips land per day. 0 — the default — is all of them at once.
     postiz_per_day?: number;
@@ -724,18 +700,6 @@ export const getExecutionStatus = async (projectId: string): Promise<Record<stri
 
 export const getSourceVideoUrl = (projectId: string, originalFile: string) => {
   return `${BASE_URL}/projects/static/${projectId}/${originalFile.split('/').pop()}`;
-};
-
-/**
- * A rendered clip's file.
- *
- * `version` is the highlight's `rendered_at`. A re-cut clip keeps its filename,
- * so without it the browser plays the copy it already has and a regenerated
- * clip looks like nothing happened.
- */
-export const getClipVideoUrl = (projectId: string, filename: string, version?: string | null) => {
-  const url = `${BASE_URL}/projects/static/${projectId}/clips/${filename}`;
-  return version ? `${url}?v=${encodeURIComponent(version)}` : url;
 };
 
 /**
@@ -1069,22 +1033,6 @@ export const updateClipTrim = async (
   return apiRequest(`/project/${projectId}/clip/${clipIndex}/trim`, {
     method: 'PUT',
     body: JSON.stringify(window),
-  });
-};
-
-/**
- * Re-cuts one clip with whatever its settings now say.
- *
- * Unlike `uploadClip` this returns as soon as the render has been queued — an
- * encode outlives a browser request. The `job` it answers with is a key on
- * `/active_processes`, which is gone once the new file is on disk.
- */
-export const regenerateClip = async (
-  projectId: string,
-  clipIndex: number
-): Promise<{ status: string; job: string }> => {
-  return apiRequest(`/project/${projectId}/clip/${clipIndex}/regenerate`, {
-    method: 'POST',
   });
 };
 

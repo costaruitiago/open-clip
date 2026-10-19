@@ -4,10 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Clip, type ClipData } from './Clip';
 import { stubFrameSize } from '../../test/stubFrame';
 import {
-  getActiveProcesses,
   getCaptionStyles,
   getClipCaptions,
-  regenerateClip,
   importClipToPostiz,
   uploadClip,
 } from '../../api';
@@ -19,11 +17,10 @@ vi.mock('../../api', async (importOriginal) => ({
   // the answer is "none", which is also what a project with no transcript gets.
   getClipCaptions: vi.fn().mockResolvedValue({ enabled: false, style: {}, duration: 0, cues: [] }),
   getCaptionStyles: vi.fn().mockResolvedValue({}),
-  regenerateClip: vi.fn().mockResolvedValue({ status: 'started', job: 'test-project-123:0' }),
-  // Watched only while a render is running; an empty list means nothing is.
+  // Watched only while a job is running; an empty list means nothing is.
   getActiveProcesses: vi.fn().mockResolvedValue([]),
-  // Like the re-cut, an upload answers with the key to watch: it cuts the clip
-  // before it publishes it, which outlives the request.
+  // An upload answers with the key to watch: it cuts the clip before it
+  // publishes it, which outlives the request.
   uploadClip: vi.fn().mockResolvedValue({
     status: 'started',
     job: 'test-project-123_upload_clip_0',
@@ -56,8 +53,6 @@ const renderClip = (clip: ClipData, aspectRatio: number | null = null) =>
 
 const renderedClip: ClipData = {
   index: 0,
-  filename: 'clip_000.mp4',
-  isRendered: true,
   original_start: 1.0,
   original_end: 3.0,
   // The card names the clip by what it would be published as; the transcript
@@ -67,7 +62,7 @@ const renderedClip: ClipData = {
   text: 'Test clip text',
 };
 
-const previewClip: ClipData = { ...renderedClip, filename: null, isRendered: false, original_end: 65 };
+const previewClip: ClipData = { ...renderedClip, original_end: 65 };
 
 /** Both halves of every state the card paints: the colour and the words. */
 const statesOf = (element: HTMLElement) => ({
@@ -81,33 +76,23 @@ describe('Clip Component', () => {
   // is finished and cannot be taken back. Every one of them carries words too,
   // because DESIGN.md does not allow status by colour alone.
   describe('state colour', () => {
-    it('shows captions already in the pixels as done, not as an exception', async () => {
-      renderClip({ ...renderedClip, captionsBurned: true });
-
-      const button = await screen.findByLabelText('Caption settings, already burned into this file');
-      expect(statesOf(button).background).toBe('var(--success)');
-      expect(statesOf(button).color).toBe('var(--on-success)');
-    });
-
     it('keeps the accent for a clip that is merely the exception', async () => {
       renderClip(renderedClip);
 
-      // Not burned, following the project: the plain card, no colour at all.
+      // Following the project: the plain card, no colour at all.
       const button = await screen.findByLabelText('Caption settings, following the project');
       expect(statesOf(button).background).toBe('');
       expect(statesOf(button).color).toBe('var(--text)');
     });
   });
 
-  it('plays a rendered clip from its own cut file', () => {
+  // The card is always the preview. Swapping to the cut file when a render
+  // landed reloaded the card mid-upload.
+  it('previews a rendered clip from the source, not its cut file', () => {
     renderClip(renderedClip);
 
     const videoElement = document.querySelector('video');
-    expect(videoElement?.getAttribute('src')).toBe(
-      'http://localhost:8000/projects/static/test-project-123/clips/clip_000.mp4'
-    );
-    // Clips are reviewed by watching them repeatedly; playback repeats until paused.
-    expect(videoElement?.loop).toBe(true);
+    expect(videoElement?.getAttribute('src')).toBe(SOURCE_URL);
     // A rendered card carries no state pill: the picture playing from its own
     // start already says the file exists.
     expect(screen.queryByText('Rendered')).toBeNull();
@@ -166,29 +151,15 @@ describe('Clip Component', () => {
     expect(screen.queryByText('0:01–1:05')).toBeNull();
   });
 
-  // Changing the project's aspect ratio re-shapes the preview and re-cuts
-  // nothing, so the file on disk was cut for a frame that is no longer on
-  // screen. Played inside the new one it is a crop the clipper will never
-  // produce, presented as the finished clip.
-  it('previews from the source again once the output settings have moved on', () => {
-    renderClip({ ...renderedClip, outputStale: true });
-
-    expect(document.querySelector('video')?.getAttribute('src')).toBe(SOURCE_URL);
-    // The re-render button is what says so.
-    expect(
-      screen.getByLabelText('Re-render this clip; the output settings changed after it was cut')
-    ).toBeDefined();
-  });
-
-  // A project whose original video has gone has no window to preview, so the
-  // old cut is the only picture there is.
-  it('keeps playing a stale cut when there is no source left to preview', () => {
+  // The cut file is for uploading and posting only. Without a source there is
+  // nothing to preview, even when a cut exists.
+  it('never plays the cut file, even when the source is gone', () => {
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <MemoryRouter>
           <Clip
             projectId="test-project-123"
-            clip={{ ...renderedClip, outputStale: true }}
+            clip={renderedClip}
             sourceUrl={null}
             aspectRatio={null}
             onDelete={() => {}}
@@ -199,9 +170,8 @@ describe('Clip Component', () => {
       </QueryClientProvider>
     );
 
-    expect(document.querySelector('video')?.getAttribute('src')).toBe(
-      'http://localhost:8000/projects/static/test-project-123/clips/clip_000.mp4'
-    );
+    expect(document.querySelector('video')).toBeNull();
+    expect(screen.getByText('No source video to preview from.')).toBeDefined();
   });
 
   it('boxes the preview to the ratio the clipper would render at', () => {
@@ -260,43 +230,6 @@ describe('Clip Component', () => {
     });
   });
 
-  // The sweep marks a clip finishing while you watch. Firing it on mount for
-  // clips rendered days ago would make every page load a party.
-  describe('render flourish', () => {
-    const renderWithRerender = (clip: ClipData) => {
-      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-      const ui = (c: ClipData) => (
-        <QueryClientProvider client={client}>
-          <MemoryRouter>
-            <Clip
-              projectId="test-project-123"
-              clip={c}
-              sourceUrl={SOURCE_URL}
-              aspectRatio={null}
-              onDelete={() => {}}
-              playingClipIndex={null}
-              setPlayingClipIndex={() => {}}
-            />
-          </MemoryRouter>
-        </QueryClientProvider>
-      );
-      const { rerender } = render(ui(clip));
-      return (next: ClipData) => rerender(ui(next));
-    };
-
-    it('stays silent for a clip that was already rendered on arrival', () => {
-      renderWithRerender(renderedClip);
-      expect(document.querySelector('.sweep-clip')).toBeNull();
-    });
-
-    it('sweeps when a preview becomes a rendered clip', () => {
-      const rerender = renderWithRerender(previewClip);
-      expect(document.querySelector('.sweep-clip')).toBeNull();
-
-      rerender({ ...previewClip, filename: 'clip_000.mp4', isRendered: true });
-      expect(document.querySelector('.sweep-clip')).not.toBeNull();
-    });
-  });
 
   // A project with twenty highlights is twenty cards, and every one of them
   // pointed a <video> at the same multi-gigabyte source on first paint.
@@ -421,29 +354,9 @@ describe('Clip Component', () => {
       const dialog = await openDialog();
 
       const video = dialog.querySelector('video');
-      expect(video?.getAttribute('src')).toBe(
-        'http://localhost:8000/projects/static/test-project-123/clips/clip_000.mp4'
-      );
+      expect(video?.getAttribute('src')).toBe(SOURCE_URL);
       // Drawn where the burn would put them, not merely described by a slider.
       await waitFor(() => expect(within(dialog).getByText('lost')).toBeDefined());
-    });
-
-    // Drawing the overlay over words that are already pixels would show both
-    // sets at once, and only the burned one is what the file actually has.
-    it('places captions on the source when the cut file already has them burned', async () => {
-      renderClip({ ...renderedClip, captionsBurned: true }, 9 / 16);
-      const dialog = await openDialog();
-
-      expect(dialog.querySelector('video')?.getAttribute('src')).toBe(SOURCE_URL);
-    });
-
-    // A layout or ratio change leaves the burned file stale, and the card falls
-    // back to the source, which has no captions in it to stand in for the overlay.
-    it('draws the captions over the source preview of a stale cut that had them burned', async () => {
-      renderClip({ ...renderedClip, captionsBurned: true, outputStale: true }, 9 / 16);
-
-      expect(document.querySelector('video')?.getAttribute('src')).toBe(SOURCE_URL);
-      await waitFor(() => expect(screen.getByText('lost')).toBeDefined());
     });
 
     it('says so when there is no video to place them against', async () => {
@@ -469,49 +382,10 @@ describe('Clip Component', () => {
     });
   });
 
-  /**
-   * Re-cutting from the grid. Caption and title edits are made per clip, and
-   * burning them in one at a time from eight detail pages is the slow half of
-   * an otherwise quick edit.
-   */
-  describe('re-render', () => {
-    beforeEach(() => {
-      vi.mocked(regenerateClip).mockClear();
-      vi.mocked(regenerateClip).mockResolvedValue({ status: 'started', job: 'test-project-123:0' });
-      vi.mocked(getActiveProcesses).mockResolvedValue(['test-project-123:0']);
-    });
-
-    it('starts a re-cut for its own clip', async () => {
-      renderClip(renderedClip);
-      fireEvent.click(screen.getByLabelText('Re-render this clip'));
-
-      await waitFor(() => expect(regenerateClip).toHaveBeenCalledWith('test-project-123', 0));
-    });
-
-    it('offers the render to a clip that has never been cut', () => {
-      renderClip(previewClip);
-      expect(screen.getByLabelText('Render this clip')).toBeInTheDocument();
-    });
-
-    // The encode takes minutes, and a button that still looks pressable is an
-    // invitation to queue a second one against the same file.
-    it('closes the button while the encode is running', async () => {
-      renderClip(renderedClip);
-      fireEvent.click(screen.getByLabelText('Re-render this clip'));
-
-      await waitFor(() => expect(screen.getByLabelText('Re-render this clip')).toBeDisabled());
-      expect(screen.getByLabelText('Re-render this clip')).toHaveAttribute('aria-busy', 'true');
-    });
-
-    // Leaving `/active_processes` is not success: ffmpeg failing looks exactly
-    // the same from there, and only the file's own stamp tells them apart.
-    it('reports a render that ended without writing a file', async () => {
-      vi.mocked(getActiveProcesses).mockResolvedValue([]);
-      renderClip(renderedClip);
-      fireEvent.click(screen.getByLabelText('Re-render this clip'));
-
-      expect(await screen.findByText(/stopped without producing a file/)).toBeInTheDocument();
-    });
+  // Clips are cut on their way out, by the upload and the Postiz import.
+  it('offers no render of its own', () => {
+    renderClip(renderedClip);
+    expect(screen.queryByLabelText(/render this clip/i)).toBeNull();
   });
 
   /**
@@ -566,32 +440,12 @@ describe('Clip Component', () => {
       expect(title.parentElement).toHaveStyle({ opacity: '1' });
     });
 
-    it('leaves a title already in the file to its own pixels', async () => {
-      renderClip({ ...renderedClip, overlayBurned: true }, 9 / 16);
-      await screen.findByLabelText(/overlay text/i);
-
-      expect(screen.queryByText('Cold open')).not.toBeInTheDocument();
-    });
-
     it('opens the title editor with the clip to place it against', async () => {
       renderClip(renderedClip, 9 / 16);
       fireEvent.click(await screen.findByLabelText('Edit overlay text'));
 
       const dialog = screen.getByRole('dialog');
-      expect(dialog.querySelector('video')?.getAttribute('src')).toBe(
-        'http://localhost:8000/projects/static/test-project-123/clips/clip_000.mp4'
-      );
-    });
-
-    // The burned copy is in the frames; drawing the edit over it would place
-    // the title against a picture that already has one.
-    it('places a burned title against the source instead of the cut file', async () => {
-      renderClip({ ...renderedClip, overlayBurned: true }, 9 / 16);
-      // A burned title names its own state, so the button is no longer just
-      // "Edit overlay text" for this clip.
-      fireEvent.click(await screen.findByLabelText('Overlay text, already burned into this file'));
-
-      expect(screen.getByRole('dialog').querySelector('video')?.getAttribute('src')).toBe(SOURCE_URL);
+      expect(dialog.querySelector('video')?.getAttribute('src')).toBe(SOURCE_URL);
     });
   });
 

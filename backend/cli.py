@@ -69,9 +69,6 @@ def handle_highlights(args):
 def handle_metadata(args):
     _run_step(args.project_id, "metadata")
 
-def handle_clipper(args):
-    _run_step(args.project_id, "clipper")
-
 def handle_upload(args):
     _run_step(args.project_id, "upload")
 
@@ -115,10 +112,6 @@ def main():
     metadata_parser = subparsers.add_parser("metadata", help="Generate project metadata")
     metadata_parser.add_argument("project_id", help="Project ID")
 
-    # Clipper (Requires project_id)
-    clipper_parser = subparsers.add_parser("clipper", help="Generate video clips")
-    clipper_parser.add_argument("project_id", help="Project ID")
-
     # Upload (Requires project_id)
     upload_parser = subparsers.add_parser("upload", help="Upload clips")
     upload_parser.add_argument("project_id", help="Project ID")
@@ -137,8 +130,6 @@ def main():
         handle_highlights(args)
     elif args.command == "metadata":
         handle_metadata(args)
-    elif args.command == "clipper":
-        handle_clipper(args)
     elif args.command == "upload":
         handle_upload(args)
 

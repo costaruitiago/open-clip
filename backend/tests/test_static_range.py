@@ -73,10 +73,10 @@ def test_ranges_this_server_does_not_honour_fall_back_to_the_whole_file(header):
 
 @pytest.fixture
 def clip_server(tmp_path, monkeypatch):
-    """Serves one project containing a single clip, on a throwaway port."""
+    """Serves one project containing a source video, on a throwaway port."""
     project_dir = tmp_path / "projects" / PROJECT_ID
-    (project_dir / "clips").mkdir(parents=True)
-    (project_dir / "clips" / "clip_000.mp4").write_bytes(CLIP_BYTES)
+    project_dir.mkdir(parents=True)
+    (project_dir / "original.mp4").write_bytes(CLIP_BYTES)
     (project_dir / "metadata.json").write_text(json.dumps({
         "project_id": PROJECT_ID,
         "name": "Test Project",
@@ -95,7 +95,7 @@ def clip_server(tmp_path, monkeypatch):
     thread.start()
     try:
         host, port = server.server_address[:2]
-        yield f"http://{host}:{port}/projects/static/{PROJECT_ID}/clips/clip_000.mp4"
+        yield f"http://{host}:{port}/projects/static/{PROJECT_ID}/original.mp4"
     finally:
         server.shutdown()
         server.server_close()
@@ -124,18 +124,6 @@ def test_advertises_range_support_on_a_plain_request(clip_server):
     assert response.headers["Accept-Ranges"] == "bytes"
     assert response.headers["Content-Length"] == str(len(CLIP_BYTES))
     assert body == CLIP_BYTES
-
-
-def test_a_cache_busting_version_tag_is_not_part_of_the_filename(clip_server):
-    """A re-cut clip keeps its filename, so the browser is sent `?v=<rendered_at>`.
-
-    Read off the raw path, that tag became part of the name being looked up and
-    every regenerated clip 404'd — the player reported the file as unplayable.
-    """
-    response = get(f"{clip_server}?v=2026-08-20T13%3A51%3A00")
-
-    assert response.status == 200
-    assert response.read() == CLIP_BYTES
 
 
 def test_rejects_a_range_that_starts_past_the_end(clip_server):

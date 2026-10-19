@@ -7,7 +7,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   getProjectMetadata,
   getClipCaptions,
-  regenerateClip,
   syncPostiz,
   updateClipOverlay,
   uploadClip,
@@ -71,8 +70,6 @@ const overlayText: OverlayText = {
 
 vi.mock('../../api', () => ({
   getProjectMetadata: vi.fn(),
-  getClipVideoUrl: (projectId: string, filename: string, version?: string | null) =>
-    `/static/${projectId}/clips/${filename}${version ? `?v=${version}` : ''}`,
   getSourceVideoUrl: (projectId: string, file: string) => `/static/${projectId}/${file}`,
   getAspectRatioMap: vi.fn().mockResolvedValue({ '9:16': '9:16' }),
   getResolutionMap: vi.fn().mockResolvedValue({ '1080p': '1920x1080' }),
@@ -93,7 +90,6 @@ vi.mock('../../api', () => ({
   updateProjectSettings: vi.fn().mockResolvedValue({ status: 'success' }),
   updateClipOverlay: vi.fn().mockResolvedValue({ status: 'success', overlay: null }),
   uploadClip: vi.fn(),
-  regenerateClip: vi.fn(),
   getActiveProcesses: vi.fn().mockResolvedValue([]),
   // Inline rather than the `overlayText` below: a mock factory is hoisted above
   // everything in this file, so it can only close over what it defines itself.
@@ -129,7 +125,6 @@ const highlight = (overrides: Partial<Highlight> = {}): Highlight => ({
   start: 0,
   end: 10,
   is_clip_generated: false,
-  generated_clip_filename: null,
   ...overrides,
 });
 
@@ -318,9 +313,9 @@ describe('ClipDetail Component', () => {
   it('resolves the route index against every highlight', async () => {
     vi.mocked(getProjectMetadata).mockResolvedValue(
       project([
-        highlight({ viral_hook_text: 'FIRST CUT', is_clip_generated: true, generated_clip_filename: 'first.mp4' }),
+        highlight({ viral_hook_text: 'FIRST CUT', is_clip_generated: true }),
         highlight({ viral_hook_text: 'NOT RENDERED', highlight_text: 'second transcript' }),
-        highlight({ viral_hook_text: 'THIRD', is_clip_generated: true, generated_clip_filename: 'third.mp4' }),
+        highlight({ viral_hook_text: 'THIRD', is_clip_generated: true }),
       ])
     );
 
@@ -332,34 +327,11 @@ describe('ClipDetail Component', () => {
     expect(screen.queryByText('FIRST CUT')).toBeNull();
   });
 
-  it('plays a rendered clip from its own file and loops it', async () => {
+  // The cut file is for uploading and posting only.
+  it('previews a rendered clip from the source, never its cut file', async () => {
     vi.mocked(getProjectMetadata).mockResolvedValue(
       project([
-        highlight({ viral_hook_text: 'FIRST CUT', is_clip_generated: true, generated_clip_filename: 'first.mp4' }),
-      ])
-    );
-
-    renderDetail('0');
-
-    const video = (await screen.findByLabelText('FIRST CUT')) as HTMLVideoElement;
-    expect(video.getAttribute('src')).toBe('/static/test-project/clips/first.mp4');
-    // Review loop: playback repeats until the user pauses.
-    expect(video.loop).toBe(true);
-  });
-
-  // Changing the project's ratio re-shapes this player and re-cuts nothing, so
-  // the file made under the old ratio would play inside a frame it was never
-  // cut for — a crop the clipper will not produce, shown as the finished clip.
-  it('goes back to the source once the file no longer matches the output settings', async () => {
-    vi.mocked(getProjectMetadata).mockResolvedValue(
-      project([
-        highlight({
-          viral_hook_text: 'FIRST CUT',
-          is_clip_generated: true,
-          generated_clip_filename: 'first.mp4',
-          rendered_aspect_ratio: '16:9',
-          rendered_resolution: 'keep original',
-        }),
+        highlight({ viral_hook_text: 'FIRST CUT', is_clip_generated: true }),
       ])
     );
 
@@ -377,7 +349,6 @@ describe('ClipDetail Component', () => {
         highlight({
           viral_hook_text: 'PUBLISHED',
           is_clip_generated: true,
-          generated_clip_filename: 'first.mp4',
           youtube_video_id: 'abc123',
           youtube_url: 'https://youtube.com/watch?v=abc123',
         }),
@@ -406,7 +377,6 @@ describe('ClipDetail Component', () => {
         highlight({
           viral_hook_text: 'PUBLISHED',
           is_clip_generated: true,
-          generated_clip_filename: 'first.mp4',
           youtube_video_id: 'abc123',
           youtube_url: 'https://youtube.com/watch?v=abc123',
         }),
@@ -434,7 +404,6 @@ describe('ClipDetail Component', () => {
         highlight({
           viral_hook_text: 'PUBLISHED',
           is_clip_generated: true,
-          generated_clip_filename: 'first.mp4',
           youtube_video_id: 'abc123',
           youtube_url: 'https://youtube.com/watch?v=abc123',
         }),
@@ -464,51 +433,20 @@ describe('ClipDetail Component', () => {
     expect(await screen.findByText('first')).toBeDefined();
   });
 
-  it('does not overlay captions on a clip whose file already has them burned in', async () => {
+  // The cut file plays no part in the preview, so a rendered clip draws its
+  // captions the same as one never cut.
+  it('overlays captions on a rendered clip', async () => {
     vi.mocked(getProjectMetadata).mockResolvedValue(
-      project([
-        highlight({
-          viral_hook_text: 'FIRST CUT',
-          is_clip_generated: true,
-          generated_clip_filename: 'first.mp4',
-          captions_burned: true,
-        }),
-      ])
+      project([highlight({ viral_hook_text: 'FIRST CUT', is_clip_generated: true })])
     );
     vi.mocked(getClipCaptions).mockResolvedValue({
       ...captionsWith(null),
-      cues: [{ start: 0, end: 1, text: 'burned in', words: [{ text: 'burned', start: 0, end: 1 }] }],
+      cues: [{ start: 0, end: 1, text: 'drawn', words: [{ text: 'drawn', start: 0, end: 1 }] }],
     });
 
     renderDetail('0');
 
-    // The captions are in the file's own pixels; drawing them again would
-    // double every word.
-    await screen.findByLabelText('FIRST CUT');
-    expect(screen.queryByText('burned')).toBeNull();
-  });
-
-  it('overlays captions on a clip rendered before captions were turned on', async () => {
-    vi.mocked(getProjectMetadata).mockResolvedValue(
-      project([
-        highlight({
-          viral_hook_text: 'FIRST CUT',
-          is_clip_generated: true,
-          generated_clip_filename: 'first.mp4',
-          captions_burned: false,
-        }),
-      ])
-    );
-    vi.mocked(getClipCaptions).mockResolvedValue({
-      ...captionsWith(null),
-      cues: [{ start: 0, end: 1, text: 'not yet', words: [{ text: 'pending', start: 0, end: 1 }] }],
-    });
-
-    renderDetail('0');
-
-    // Otherwise a project that has already been through the clipper shows no
-    // captions anywhere, and the styling controls look broken.
-    expect(await screen.findByText('pending')).toBeDefined();
+    expect(await screen.findByText('drawn')).toBeDefined();
   });
 
   it('reports a missing clip when the index is past the highlights', async () => {
@@ -597,7 +535,6 @@ describe('ClipDetail Component', () => {
           viral_hook_text: 'HOOK',
           video_title_for_youtube_short: 'A title viewers will see',
           is_clip_generated: true,
-          generated_clip_filename: 'first.mp4',
         }),
       ])
     );
@@ -623,7 +560,7 @@ describe('ClipDetail Component', () => {
     });
     vi.mocked(getProjectMetadata).mockResolvedValue(
       project([
-        highlight({ viral_hook_text: 'HOOK', is_clip_generated: true, generated_clip_filename: 'first.mp4' }),
+        highlight({ viral_hook_text: 'HOOK', is_clip_generated: true }),
       ])
     );
 
@@ -657,7 +594,6 @@ describe('ClipDetail Component', () => {
     const published = highlight({
       viral_hook_text: 'HOOK',
       is_clip_generated: true,
-      generated_clip_filename: 'first.mp4',
       youtube_url: 'https://youtu.be/abc123',
       uploaded_at: '2026-08-20T11:00:00',
     });
@@ -666,7 +602,6 @@ describe('ClipDetail Component', () => {
       .mockResolvedValueOnce(project([highlight({
         viral_hook_text: 'HOOK',
         is_clip_generated: true,
-        generated_clip_filename: 'first.mp4',
       })]))
       .mockResolvedValue(project([published]));
 
@@ -688,8 +623,7 @@ describe('ClipDetail Component', () => {
         highlight({
           viral_hook_text: 'HOOK',
           is_clip_generated: true,
-          generated_clip_filename: 'first.mp4',
-          // Written by whichever part gave up — here, the cut that precedes it.
+// Written by whichever part gave up — here, the cut that precedes it.
           upload_error: 'The source video for this project is missing.',
         }),
       ])
@@ -709,7 +643,7 @@ describe('ClipDetail Component', () => {
     vi.mocked(uploadClip).mockRejectedValue(new TypeError('Failed to fetch'));
     vi.mocked(getProjectMetadata).mockResolvedValue(
       project([
-        highlight({ viral_hook_text: 'HOOK', is_clip_generated: true, generated_clip_filename: 'first.mp4' }),
+        highlight({ viral_hook_text: 'HOOK', is_clip_generated: true }),
       ])
     );
 
@@ -725,66 +659,15 @@ describe('ClipDetail Component', () => {
     expect(screen.queryByText(/Could not reach the server/i)).toBeNull();
   });
 
-  // Re-cutting one clip is what turns a caption or title change into a file,
-  // and it is the only action here that works before anything has been
-  // rendered at all.
-  describe('regenerating the clip', () => {
-    it('re-cuts a clip that has already been rendered', async () => {
-      vi.mocked(regenerateClip).mockResolvedValue({ status: 'started', job: 'test-project_clip_0' });
-      vi.mocked(getProjectMetadata).mockResolvedValue(
-        project([
-          highlight({ viral_hook_text: 'HOOK', is_clip_generated: true, generated_clip_filename: 'first.mp4' }),
-        ])
-      );
-
-      renderDetail('0');
-
-      fireEvent.click(await screen.findByRole('button', { name: /^regenerate clip$/i }));
-      expect(regenerateClip).toHaveBeenCalledWith('test-project', 0);
-      // The encode outlives the request, so the button reports that it is
-      // running rather than falling straight back to its resting label.
-      expect(await screen.findByRole('button', { name: /rendering this clip/i })).toBeDefined();
-    });
-
-    it('offers to render a clip the clipper has never cut', async () => {
+  describe('the cut file', () => {
+    // Clips are cut on their way out, by the upload and the Postiz import.
+    it('offers no render of its own', async () => {
       vi.mocked(getProjectMetadata).mockResolvedValue(project([highlight({ viral_hook_text: 'HOOK' })]));
 
       renderDetail('0');
 
-      const button = await screen.findByRole('button', { name: /^render this clip$/i });
-      expect(button.hasAttribute('disabled')).toBe(false);
-    });
-
-    it('says why the render could not be started', async () => {
-      vi.mocked(regenerateClip).mockRejectedValue(new TypeError('Failed to fetch'));
-      vi.mocked(getProjectMetadata).mockResolvedValue(
-        project([
-          highlight({ viral_hook_text: 'HOOK', is_clip_generated: true, generated_clip_filename: 'first.mp4' }),
-        ])
-      );
-
-      renderDetail('0');
-
-      fireEvent.click(await screen.findByRole('button', { name: /^regenerate clip$/i }));
-      expect((await screen.findByRole('alert')).textContent).toContain('Could not reach the server');
-    });
-
-    it('plays the new cut rather than the copy the browser already has', async () => {
-      vi.mocked(getProjectMetadata).mockResolvedValue(
-        project([
-          highlight({
-            viral_hook_text: 'HOOK',
-            is_clip_generated: true,
-            generated_clip_filename: 'first.mp4',
-            rendered_at: '2026-08-20T10:00:00',
-          }),
-        ])
-      );
-
-      renderDetail('0');
-
-      const video = await screen.findByLabelText('HOOK');
-      expect(video.getAttribute('src')).toContain('?v=2026-08-20T10:00:00');
+      await screen.findByRole('button', { name: /^upload to youtube$/i });
+      expect(screen.queryByRole('button', { name: /render this clip|regenerate clip/i })).toBeNull();
     });
   });
 
@@ -822,9 +705,7 @@ describe('ClipDetail Component', () => {
           highlight({
             viral_hook_text: 'HOOK',
             is_clip_generated: true,
-            generated_clip_filename: 'first.mp4',
             overlay: { ...overlayText, text: 'Cold open' },
-            overlay_burned: false,
           }),
         ])
       );
@@ -835,50 +716,6 @@ describe('ClipDetail Component', () => {
       renderDetail('0');
 
       expect(await screen.findByText('Cold open')).toBeDefined();
-    });
-
-    it('does not draw a title the rendered file already carries', async () => {
-      vi.mocked(getProjectMetadata).mockResolvedValue(
-        project([
-          highlight({
-            viral_hook_text: 'HOOK',
-            is_clip_generated: true,
-            generated_clip_filename: 'first.mp4',
-            overlay: { ...overlayText, text: 'Cold open' },
-            overlay_burned: true,
-          }),
-        ])
-      );
-      vi.mocked(getClipCaptions).mockResolvedValue(
-        captionsWith({ ...overlayText, text: 'Cold open' }, false)
-      );
-
-      renderDetail('0');
-
-      // It is in the file's own pixels; drawing it again would double it.
-      await screen.findByLabelText('HOOK');
-      expect(screen.queryByText('Cold open')).toBeNull();
-    });
-
-    it('says a saved title is not in the rendered file until the clip is re-cut', async () => {
-      vi.mocked(getProjectMetadata).mockResolvedValue(
-        project([
-          highlight({
-            viral_hook_text: 'HOOK',
-            is_clip_generated: true,
-            generated_clip_filename: 'first.mp4',
-            overlay: { ...overlayText, text: 'Cold open' },
-            overlay_burned: false,
-          }),
-        ])
-      );
-      vi.mocked(getClipCaptions).mockResolvedValue(
-        captionsWith({ ...overlayText, text: 'Cold open' }, false)
-      );
-
-      renderDetail('0');
-
-      expect(await screen.findByText(/Regenerate the clip to burn it in/i)).toBeDefined();
     });
   });
 });

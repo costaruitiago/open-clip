@@ -778,106 +778,11 @@ def test_the_channel_list_is_asked_for_once_per_run(project_root):
     assert len(asked) == 1
 
 
-# --- Filing a clip the moment it is cut -------------------------------------
-
-def configured(**overrides):
-    """Settings with Postiz set up, which is what the hook checks first."""
-    values = {"postiz_api_key": "pk-1", "postiz_channels": BOTH_CHANNELS}
-    values.update(overrides)
-    return values
-
-
-def test_a_freshly_cut_clip_is_filed_without_being_cut_again(project_root):
-    # The whole point: the clipper has just written this file, and encoding it
-    # a second time to send the same video would double the wait per clip.
-    project_dir = write_project(project_root, [highlight()])
-    write_clip(project_dir)
-    clipper = FakeClipper(project_dir)
-    client = FakePostiz()
-
-    result = publisher(
-        project_dir, client, settings=configured(), clipper=clipper
-    ).import_rendered(Project(PROJECT_ID), 0)
-
-    assert clipper.calls == []
-    assert result["post_id"] == "post-1"
-    assert client.uploads[0].endswith("clips/clip_000.mp4")
-
-
-def test_nothing_is_filed_when_postiz_is_not_configured(project_root):
-    # The ordinary state of a project whose owner does not use Postiz. Not a
-    # failure, and not something to write on the clip.
-    project_dir = write_project(project_root, [highlight()])
-    write_clip(project_dir)
-    client = FakePostiz()
-
-    assert publisher(project_dir, client).import_rendered(Project(PROJECT_ID), 0) is None
-
-    assert client.posts == []
-    # Nothing was written back at all: the highlight is as it was on disk.
-    assert read_metadata()["highlights"][0].get("postiz_error") is None
-
-
-def test_filing_as_clips_are_cut_can_be_turned_off(project_root):
-    project_dir = write_project(project_root, [highlight()])
-    write_clip(project_dir)
-    client = FakePostiz()
-    service = publisher(
-        project_dir, client, settings=configured(postiz_import_on_render=False)
-    )
-
-    assert service.import_rendered(Project(PROJECT_ID), 0) is None
-    assert client.posts == []
-
-
-def test_a_postiz_that_is_down_does_not_fail_the_clip_that_was_cut(project_root):
-    # The clip is on disk and perfectly good; the scheduler being down must not
-    # take the nineteen clips after it down with the run.
-    project_dir = write_project(project_root, [highlight()])
-    write_clip(project_dir)
-    client = FakePostiz()
-    client.post_error = RuntimeError("Postiz answered 500")
-
-    result = publisher(
-        project_dir, client, settings=configured()
-    ).import_rendered(Project(PROJECT_ID), 0)
-
-    assert result is None
-    # Recorded where the clip's own card reads it back.
-    assert read_metadata()["highlights"][0]["postiz_error"] == "Postiz answered 500"
-
-
-def test_the_clipper_hands_each_clip_over_as_it_finishes(project_root):
-    from backend.src.services.clipper import Clipper
-
-    seen = []
-    clipper = Clipper(on_clip_rendered=lambda project, index: seen.append(index))
-    write_project(project_root, [highlight(), highlight()])
-    project = Project(PROJECT_ID)
-
-    clipper._announce_clip(project, 0)
-    clipper._announce_clip(project, 1)
-
-    assert seen == [0, 1]
-
-
-def test_a_handler_that_falls_over_does_not_fail_the_cut(project_root):
-    from backend.src.services.clipper import Clipper
-
-    def explode(project, index):
-        raise RuntimeError("Postiz is down")
-
-    write_project(project_root, [highlight()])
-    # No exception: the clip is cut, and what happens to it afterwards is not
-    # what the clipper is judged on.
-    Clipper(on_clip_rendered=explode)._announce_clip(Project(PROJECT_ID), 0)
-
-
-# --- The step after the clipper has already filed everything ----------------
+# --- A step run again after everything is already filed ---------------------
 
 def test_a_clip_filed_since_its_last_cut_is_not_filed_twice(project_root):
-    # Otherwise running the step after a Clips run puts a second identical
-    # draft on the calendar for every clip in the project.
+    # Otherwise running the step a second time puts a second identical draft
+    # on the calendar for every clip in the project.
     project_dir = write_project(project_root, [highlight(
         rendered_at="2026-01-01T10:00:00",
         postiz_imported_at="2026-01-01T10:00:05",

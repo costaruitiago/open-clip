@@ -75,7 +75,6 @@ def test_answers_with_the_project_s_step_statuses(status_url):
 
     assert response.status == 200
     assert payload["transcript"] == "completed"
-    assert payload["progress"] == {"generated": 1, "total": 1}
 
 
 def test_carries_the_clock_the_page_measures_elapsed_time_against(status_url):
@@ -122,11 +121,11 @@ def test_a_step_that_failed_says_why(status_url):
 
 
 def test_a_partly_done_step_is_reported_as_partial(serve):
-    payload = json.loads(urllib.request.urlopen(serve({"clipper": "partial"})).read())
+    payload = json.loads(urllib.request.urlopen(serve({"upload": "partial"})).read())
 
     # Passed through rather than folded into "completed" or "error": the page
     # paints it amber and offers to finish it.
-    assert payload["clipper"] == "partial"
+    assert payload["upload"] == "partial"
 
 
 def test_a_partly_done_dependency_does_not_lock_the_steps_after_it(serve):
@@ -136,11 +135,11 @@ def test_a_partly_done_dependency_does_not_lock_the_steps_after_it(serve):
     url = serve({"transcription": "completed", "highlights": "partial"})
     payload = json.loads(urllib.request.urlopen(url).read())
 
-    assert payload["clipper"] == "todo"
+    assert payload["upload"] == "todo"
     assert payload["postiz"] == "todo"
 
 
 def test_a_step_whose_dependency_never_ran_is_still_locked(serve):
     payload = json.loads(urllib.request.urlopen(serve({})).read())
 
-    assert payload["clipper"] == "locked"
+    assert payload["upload"] == "locked"

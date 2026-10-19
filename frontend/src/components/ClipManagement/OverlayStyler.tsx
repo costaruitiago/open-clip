@@ -127,7 +127,7 @@ export const OverlayStyler: React.FC<OverlayStylerProps> = ({ projectId, overlay
         <p style={{ margin: '0 0 var(--space-md) 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
           How every title in this project is drawn. The words belong to the clip — write them
           with <strong>Add overlay text</strong> on a clip. {current.enabled
-            ? 'Titles are burned into rendered clips; regenerate a clip to apply a change to its file.'
+            ? 'Titles are burned into clips when they are uploaded or imported.'
             : 'Titles are not burned into the video.'}
         </p>
 

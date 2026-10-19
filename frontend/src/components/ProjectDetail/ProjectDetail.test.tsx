@@ -32,7 +32,6 @@ const highlight = (text: string, clip?: string) => ({
   start: 0,
   end: 1,
   is_clip_generated: Boolean(clip),
-  generated_clip_filename: clip,
 });
 
 const metadata = (highlights: unknown[]): ProjectMetadata => ({

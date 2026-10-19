@@ -90,7 +90,6 @@ class TestOverlayPersistence:
         highlight = Project(PROJECT_ID).highlights[0]
 
         assert highlight.overlay is None
-        assert highlight.overlay_burned is False
 
     def test_garbage_does_not_break_loading(self, project_root):
         write_project(project_root, overlay="a nice title please")
@@ -402,33 +401,10 @@ class TestSingleClipRender:
         stored = Project(PROJECT_ID).highlights[0]
 
         assert stored.is_clip_generated is True
-        assert stored.captions_burned is True
-        assert stored.overlay_burned is True
-        # What busts a browser cache holding the previous cut of the same name.
+        # What tells a Postiz draft filed from an older cut that it is stale.
         assert stored.rendered_at is not None
-        # And the shape it was cut to, so the page can tell a file that still
-        # matches the project's output settings from one that only used to.
-        assert stored.rendered_aspect_ratio == "9:16"
-        assert stored.rendered_resolution == "1080p"
 
-    def test_a_cut_records_the_settings_it_was_made_under(self, project_root, monkeypatch):
-        """A clip re-cut after the ratio changed records the new ratio.
-
-        The recorded pair is what the project page compares against, so a
-        re-render has to clear the staleness it was pressed to fix.
-        """
-        project = self._project_with_two_clips(project_root)
-        monkeypatch.setattr("backend.src.services.clipper.OpenCVVideoEngine", lambda path: FakeEngine())
-        clipper = Clipper()
-        clipper.render_one(project, 0)
-
-        project.settings.aspect_ratio = "1:1"
-        project.set_property("settings", project.settings)
-        clipper.render_one(Project(PROJECT_ID), 0)
-
-        assert Project(PROJECT_ID).highlights[0].rendered_aspect_ratio == "1:1"
-
-    def test_a_stacked_project_cuts_stacked_and_records_it(self, project_root, monkeypatch):
+    def test_a_stacked_project_cuts_stacked(self, project_root, monkeypatch):
         project = self._project_with_two_clips(project_root)
         project.settings.layout = "stacked"
         project.settings.stack_darkness = 70
@@ -440,15 +416,6 @@ class TestSingleClipRender:
 
         assert engine.calls[0]["layout"] == "stacked"
         assert engine.calls[0]["stack_darkness"] == 70
-        assert Project(PROJECT_ID).highlights[0].rendered_layout == "stacked"
-
-    def test_a_clip_with_no_title_burns_none(self, project_root, monkeypatch):
-        project = self._project_with_two_clips(project_root)
-        monkeypatch.setattr("backend.src.services.clipper.OpenCVVideoEngine", lambda path: FakeEngine())
-
-        Clipper().render_one(project, 1)
-
-        assert Project(PROJECT_ID).highlights[1].overlay_burned is False
 
     def test_no_highlight_at_that_index_is_refused(self, project_root, monkeypatch):
         project = self._project_with_two_clips(project_root)
@@ -456,11 +423,3 @@ class TestSingleClipRender:
 
         with pytest.raises(IndexError):
             Clipper().render_one(project, 7)
-
-    def test_completing_the_last_missing_clip_completes_the_step(self, project_root, monkeypatch):
-        project = self._project_with_two_clips(project_root)
-        monkeypatch.setattr("backend.src.services.clipper.OpenCVVideoEngine", lambda path: FakeEngine())
-
-        Clipper().render_one(project, 0)
-
-        assert Project(PROJECT_ID).step_statuses["clipper"] == "completed"

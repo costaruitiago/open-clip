@@ -33,7 +33,6 @@ const renderTrimmer = (props: Partial<React.ComponentProps<typeof ClipTrimmer>> 
         sourceUrl="http://example.test/source.mp4"
         aspectRatio={9 / 16}
         label="Clip 1"
-        isRendered={false}
         {...props}
       />
     </QueryClientProvider>
@@ -184,30 +183,9 @@ describe('ClipTrimmer', () => {
     expect(updateClipTrim).not.toHaveBeenCalled();
   });
 
-  // A trim cuts nothing, so a clip that already has a file needs one made
-  // again — offered here rather than left to be remembered.
-  it('offers to re-cut a clip that already has a file, and does it after saving', async () => {
-    const onRerender = vi.fn();
-    renderTrimmer({ isRendered: true, onRerender });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Move the end of the clip 1 seconds earlier' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save and re-cut' }));
-
-    await waitFor(() => expect(onRerender).toHaveBeenCalledTimes(1));
-    expect(updateClipTrim).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(updateClipTrim).mock.calls[0][2]).toEqual({ start: 10, end: 29 });
-  });
-
-  it('does not offer a re-cut for a clip nothing has been cut from', () => {
-    renderTrimmer({ isRendered: false, onRerender: vi.fn() });
-
-    expect(screen.queryByRole('button', { name: 'Save and re-cut' })).toBeNull();
-  });
-
-  // The clip detail page owns its own re-cut button and reports on it; a second
-  // one in here would start a render nothing on screen was watching.
-  it('does not offer a re-cut where the caller has none to run', () => {
-    renderTrimmer({ isRendered: true });
+  // Clips are cut on their way out, never from here.
+  it('does not offer a re-cut', () => {
+    renderTrimmer();
 
     expect(screen.queryByRole('button', { name: 'Save and re-cut' })).toBeNull();
   });

@@ -24,7 +24,6 @@ from backend.src.dataclasses.data import (
 )
 from backend.src.infrastructure.font_metrics import resolve_face
 from backend.src.registry import list_projects, delete_project
-from backend.src.services import highlight_options
 from backend.src.services.marker_exporter import MarkerExporter, DEFAULT_RECORD_START
 from backend.src.services.chapter_exporter import ChapterExporter, NoChaptersError
 from backend.src.services.ass_writer import render_ass
@@ -356,19 +355,12 @@ class SimpleHandler(BaseHTTPRequestHandler):
         self.send_json_response(all_projects)
 
     def handle_get_project_file(self):
-        # The path without its query: a re-cut clip keeps its filename, so the
-        # browser is sent `?v=<rendered_at>` to stop it replaying the copy it
-        # already has. Split off `self.path` raw, that version tag became part
-        # of the filename and every regenerated clip 404'd.
         parts = urlparse(self.path).path.split('/')
         project_id = parts[3]
         rel_path = '/'.join(parts[4:])
         try:
             project = Project(project_id)
-            if rel_path.startswith('clips/'):
-                file_path = Path(project.get_clip_path(rel_path.split('/')[-1]))
-            else:
-                file_path = Path(project.base_directory) / project_id / rel_path
+            file_path = Path(project.base_directory) / project_id / rel_path
 
             if file_path.exists() and file_path.is_file():
                 # An <img> pointed at an octet-stream is a download rather
@@ -437,15 +429,7 @@ class SimpleHandler(BaseHTTPRequestHandler):
         
         # Merge file statuses with active processes
         statuses = project.step_statuses.copy()
-        
-        # Add progress metadata: of the project's clips only, which is what the
-        # cut step works through — not the lower-scoring moments it skips.
-        selected = highlight_options.selected_indices(project)
-        total_clips = len(selected)
-        generated_clips = len([
-            h for i, h in enumerate(project.highlights) if i in selected and h.is_clip_generated
-        ])
-        statuses["progress"] = {"generated": generated_clips, "total": total_clips}
+
         # What each running step is doing, and since when. A step that reports
         # nothing still gets an entry with `since` in it, which is what lets the
         # page say how long it has been running rather than only that it is.

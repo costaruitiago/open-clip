@@ -1112,17 +1112,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
             <option value="now">Posted immediately</option>
           </select>
         </Field>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', minHeight: '44px', ...labelStyle }}>
-          <input
-            type="checkbox"
-            // Default on: a configured Postiz is one somebody set up in order
-            // to send things to it.
-            checked={settings.postiz_import_on_render !== false}
-            onChange={(e) => saveSettings({ settings: { postiz_import_on_render: e.target.checked } })}
-          />
-          Import each clip as soon as it is cut
-        </label>
-        <span style={hintStyle}>Off: clips are imported when you run the Postiz Drafts step.</span>
       </Card>
 
       {/* Asked whatever an import makes, because a draft has a date too — it

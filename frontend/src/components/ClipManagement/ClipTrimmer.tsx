@@ -49,11 +49,6 @@ interface ClipTrimmerProps {
   /** Target width / height the clipper would render at, or null for source. */
   aspectRatio: number | null;
   label: string;
-  /** True once a file has been cut from this highlight. */
-  isRendered: boolean;
-  /** Runs the same re-cut the card's own button does, once the trim is saved. */
-  onRerender?: () => void;
-  isRendering?: boolean;
 }
 
 const round = (value: number) => Math.round(value * 100) / 100;
@@ -82,8 +77,8 @@ const round = (value: number) => Math.round(value * 100) / 100;
  * and the two cannot close past `MIN_CLIP_DURATION`.
  *
  * Saving moves the highlight and nothing else. The cut file, if there is one,
- * still holds the window from before the edit until the clip is rendered again,
- * which is why that render is offered here rather than left to be remembered.
+ * still holds the window from before the edit until the next upload or import
+ * cuts the clip again.
  */
 export const ClipTrimmer: React.FC<ClipTrimmerProps> = ({
   projectId,
@@ -95,9 +90,6 @@ export const ClipTrimmer: React.FC<ClipTrimmerProps> = ({
   sourceUrl,
   aspectRatio,
   label,
-  isRendered,
-  onRerender,
-  isRendering = false,
 }) => {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState({ start, end });
@@ -201,14 +193,6 @@ export const ClipTrimmer: React.FC<ClipTrimmerProps> = ({
     }
   };
 
-  const saveAndRerender = async () => {
-    // A refused save leaves the dialog open on the window that was refused,
-    // rather than cutting the clip from the one still stored.
-    if (!(await save())) return;
-    onRerender?.();
-    onClose();
-  };
-
   const edge = (
     kind: 'start' | 'end',
     value: number,
@@ -289,24 +273,12 @@ export const ClipTrimmer: React.FC<ClipTrimmerProps> = ({
       footer={
         <div style={{ display: 'flex', gap: 'var(--space-sm)', flexWrap: 'wrap' }}>
           <Button
-            variant={isRendered && onRerender ? 'ghost' : 'primary'}
+            variant="primary"
             onClick={() => void save()}
             disabled={!isDirty || mutation.isPending}
           >
             {mutation.isPending ? 'Saving…' : 'Save trim'}
           </Button>
-          {/* Offered only where it means something: a clip nobody has cut has
-              no stale file to replace, and a caller that owns no re-cut of its
-              own has one on the page behind this dialog. */}
-          {isRendered && onRerender && (
-            <Button
-              variant="primary"
-              onClick={() => void saveAndRerender()}
-              disabled={mutation.isPending || isRendering}
-            >
-              {isRendering ? 'Rendering…' : 'Save and re-cut'}
-            </Button>
-          )}
           {isDirty && (
             <Button variant="ghost" onClick={() => setDraft({ start, end })}>
               Reset
@@ -452,12 +424,7 @@ export const ClipTrimmer: React.FC<ClipTrimmerProps> = ({
           </p>
 
           <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            {!isRendered
-              ? 'Nothing is cut yet, so this window is simply what the clipper will use.'
-              : onRerender
-                ? 'The file on disk still holds the window it was cut from. Save and re-cut to replace it, or save now and re-cut this clip later.'
-                : 'The file on disk still holds the window it was cut from. Regenerate the clip to replace it.'}
-            {' The captions follow the window: words that fall outside it stop appearing.'}
+            The captions follow the window: words that fall outside it stop appearing.
           </p>
 
           {mutation.isError && (

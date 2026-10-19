@@ -1,21 +1,10 @@
 import React, { useState } from 'react';
 import { Clip } from './Clip';
-import { ClipSkeleton } from './ClipSkeleton';
 import type { JevScores } from '../../api';
 
 interface ClipRaw {
   /** Position in the project's highlights, assigned where the list is built. */
   index: number;
-  filename: string | null;
-  isRendered: boolean;
-  captionsBurned?: boolean;
-  overlayBurned?: boolean;
-  /** When the file was last cut, and when the window was last moved. A trim
-   *  cuts nothing, so the second being later means the file is behind. */
-  renderedAt?: string | null;
-  trimmedAt?: string | null;
-  /** True when the file was cut to output settings the project no longer has. */
-  outputStale?: boolean;
   /** Where this clip already lives on YouTube, once it has been published. */
   youtubeUrl?: string | null;
   youtubeVideoId?: string | null;
@@ -48,14 +37,13 @@ interface ClipManagerProps {
   /** Target width / height the clipper would render at, or null for source. */
   aspectRatio: number | null;
   onDeleteClip: (index: number) => void;
-  isLoading?: boolean;
 }
 
-const ClipGrid: React.FC<ClipManagerProps> = ({ projectId, clips, belowClips = [], sourceUrl, aspectRatio, onDeleteClip, isLoading }) => {
+const ClipGrid: React.FC<ClipManagerProps> = ({ projectId, clips, belowClips = [], sourceUrl, aspectRatio, onDeleteClip }) => {
   const [playingClipIndex, setPlayingClipIndex] = useState<number | null>(null);
   const [showBelow, setShowBelow] = useState(false);
 
-  if (clips.length === 0 && belowClips.length === 0 && !isLoading) {
+  if (clips.length === 0 && belowClips.length === 0) {
     return (
       <div style={{
         display: 'flex',
@@ -111,7 +99,8 @@ const ClipGrid: React.FC<ClipManagerProps> = ({ projectId, clips, belowClips = [
             // Keyed by the window it plays, not position: deleting a highlight
             // shifts every later index down, and an index key would hand clip
             // N+1 the mounted <video> (and its playback state) of the deleted one.
-            key={`${clip.original_start}-${clip.original_end}-${clip.filename ?? 'preview'}`}
+            // Not by filename: a render landing must not remount the card.
+            key={`${clip.original_start}-${clip.original_end}`}
             projectId={projectId}
             // Passed straight through. Spreading a fresh object in here made a
             // new prop identity on every render and undid the memo on Clip.
@@ -126,7 +115,6 @@ const ClipGrid: React.FC<ClipManagerProps> = ({ projectId, clips, belowClips = [
             setPlayingClipIndex={setPlayingClipIndex}
           />
         ))}
-        {isLoading && <ClipSkeleton />}
       </div>
 
       {belowClips.length > 0 && (
@@ -153,7 +141,7 @@ const ClipGrid: React.FC<ClipManagerProps> = ({ projectId, clips, belowClips = [
           {showBelow && (
             <div className="card-grid">
               {belowClips.map((clip) => (
-                <div key={`${clip.original_start}-${clip.original_end}-${clip.filename ?? 'preview'}`} className="clip-below-cutoff">
+                <div key={`${clip.original_start}-${clip.original_end}`} className="clip-below-cutoff">
                   <Clip
                     projectId={projectId}
                     clip={clip}

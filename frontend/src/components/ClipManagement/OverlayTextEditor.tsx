@@ -32,8 +32,6 @@ interface OverlayTextEditorProps {
   value: OverlayText;
   /** Reports the edit so the player behind the dialog redraws as it is typed. */
   onChange: (next: OverlayText) => void;
-  /** True once the rendered file already has this title in its pixels. */
-  isBurned?: boolean;
   /**
    * True while this clip has no title of its own.
    *
@@ -65,9 +63,6 @@ const FEED_WIDTH_PX = 120;
  * show the project's configuration, which is the look any title here would be
  * drawn in, until it is unlocked. Unlocking copies that look onto the clip, so
  * writing a title never means restyling one.
- *
- * Saving does not touch the rendered file — nothing does until the clip is
- * re-cut — so the dialog says so rather than letting a saved title look burned.
  */
 export const OverlayTextEditor: React.FC<OverlayTextEditorProps> = ({
   projectId,
@@ -76,7 +71,6 @@ export const OverlayTextEditor: React.FC<OverlayTextEditorProps> = ({
   onClose,
   value,
   onChange,
-  isBurned = false,
   isLocked = false,
   preview = null,
   font = null,
@@ -262,11 +256,9 @@ export const OverlayTextEditor: React.FC<OverlayTextEditorProps> = ({
       <p style={{ margin: '0 0 var(--space-md) 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
         {locked
           ? 'This clip has no title of its own. Write one and it is drawn in the project\u2019s look, which you set under Overlay titles.'
-          : isBurned
-            ? 'This title is already burned into the rendered file. Changing it here changes the next render, not the file you have.'
-            : preview
-              ? 'Saved as you type, and drawn on the clip above. Regenerate the clip to burn it into the video.'
-              : 'Saved as you type, and drawn over the player behind this dialog. Regenerate the clip to burn it into the video.'}
+          : preview
+            ? 'Saved as you type, and drawn on the clip above. Uploading or importing the clip burns it into the video.'
+            : 'Saved as you type, and drawn over the player behind this dialog. Uploading or importing the clip burns it into the video.'}
       </p>
 
       <OverlayControls

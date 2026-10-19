@@ -5,7 +5,6 @@ import {
   getProjectMetadata,
   getClipCaptions,
   getClipDescription,
-  getClipVideoUrl,
   getSourceVideoUrl,
   getAspectRatioMap,
   getResolutionMap,
@@ -24,7 +23,7 @@ import { OverlayStyler } from './OverlayStyler';
 import { ClipTrimmer } from './ClipTrimmer';
 import { StackLayoutContext, stackLayoutFor } from './StackedBands';
 import { Button } from '../Button';
-import { matchesOutputSettings, targetAspectRatio } from '../../utils/aspectRatio';
+import { targetAspectRatio } from '../../utils/aspectRatio';
 
 /**
  * A state this page cannot get itself out of.
@@ -239,50 +238,21 @@ export const ClipDetail: React.FC = () => {
   }
 
   const label = highlight.viral_hook_text || `CLIP ${clipIndexNum + 1}`;
-  // Narrowed to the filename rather than to a boolean, so the branches below
-  // carry a `string` instead of a `string | null | undefined` that only a
-  // separate flag claims is present.
-  const renderedFilename = highlight.is_clip_generated ? highlight.generated_clip_filename : null;
-  const isRendered = !!renderedFilename;
   // The title as it stands: what is being typed, or what the clip resolves to
   // — its own if it has one, otherwise the project's — or the values a new one
   // starts from. Read from the caption preview rather than from the highlight,
   // because only the backend knows which of the two a locked clip inherits.
   const overlay = overlayDraft ?? captions?.overlay ?? DEFAULT_OVERLAY_TEXT;
   const hasTitle = !!overlay.text.trim();
-  // Same rule as the captions: a title already in the file's pixels is not
-  // drawn again on top of itself. While the editor is open it is drawn anyway,
-  // because that is the only way to see what is being changed.
   const sourceUrl = projectMetadata.files?.original_file
     ? getSourceVideoUrl(projectMetadata.project_id, projectMetadata.files.original_file)
     : null;
   const aspectRatio = targetAspectRatio(projectMetadata.settings, aspectRatiosData, resolutionsData);
-  // A trim moves the window and cuts nothing, so the file can be playing
-  // footage the timecodes no longer describe. Both stamps are ISO, so the later
-  // string is the later edit.
-  const needsRecut =
-    isRendered &&
-    !!highlight.trimmed_at &&
-    (!highlight.rendered_at || highlight.trimmed_at > highlight.rendered_at);
-  // The project's aspect ratio or resolution can change after a clip is cut,
-  // and nothing re-cuts it when they do. The player below is boxed to the
-  // settings now in force, so the old file played inside it is a crop this
-  // project will never render — the honest picture is the source window under
-  // the new shape, which is what the next render will be cut from. A project
-  // whose source has gone has no such window, so there the old cut stands.
-  const outputStale = isRendered && !matchesOutputSettings(projectMetadata.settings, highlight);
-  const playsRendered = !!renderedFilename && (!outputStale || !sourceUrl);
-  // Drawn over the video unless the file already carries them, in which case
-  // overlaying would double every word. A page back on the source preview is
-  // not showing those pixels at all, so the words go back on top.
-  const showOverlay = !!captions?.cues.length && (!playsRendered || !highlight.captions_burned);
-  // Same rule as the captions: a title already in the file's pixels is not
-  // drawn again on top of itself. While the editor is open it is drawn anyway,
-  // because that is the only way to see what is being changed.
-  const showTitle =
-    hasTitle &&
-    overlay.enabled &&
-    (isEditingOverlay || !playsRendered || !highlight.overlay_burned);
+  // The player only ever shows the source window, which has nothing burned in,
+  // so captions and title are always drawn over it. The cut file exists for
+  // uploading and posting and is never played here.
+  const showOverlay = !!captions?.cues.length;
+  const showTitle = hasTitle && overlay.enabled;
 
   const socialPosts = [
     { label: 'YouTube title', content: highlight.video_title_for_youtube_short },
@@ -324,27 +294,13 @@ export const ClipDetail: React.FC = () => {
           >
             {label}
           </h1>
-          {renderedFilename || sourceUrl ? (
+          {sourceUrl ? (
             <div style={{ border: 'var(--border)' }}>
-              {/* The same player before and after the render, so the page does
-                  not change shape or swap its controls when the clipper
-                  finishes. Before, it plays the highlight's window inside the
-                  source; after, the cut file. Where the file was cut before
-                  captions were on, they are drawn over it here until the
-                  clipper is re-run. */}
               <ClipPlayer
-                src={
-                  playsRendered
-                    // Versioned by when it was cut: a regenerated clip keeps
-                    // its filename, so without this the browser replays the
-                    // copy it already has and the re-cut looks like it did
-                    // nothing.
-                    ? getClipVideoUrl(projectId!, renderedFilename as string, highlight.rendered_at)
-                    : (sourceUrl as string)
-                }
-                start={playsRendered ? 0 : highlight.start}
-                end={playsRendered ? null : highlight.end}
-                isPreview={!playsRendered}
+                src={sourceUrl}
+                start={highlight.start}
+                end={highlight.end}
+                isPreview
                 aspectRatio={aspectRatio}
                 label={label}
                 cues={captions?.cues}
@@ -453,13 +409,11 @@ export const ClipDetail: React.FC = () => {
             projectId={projectId!}
             clipIndex={clipIndexNum}
             clipTitle={highlight.video_title_for_youtube_short || label}
-            isRendered={isRendered}
             youtubeUrl={highlight.youtube_url}
             youtubeVideoId={highlight.youtube_video_id}
             youtubePrivacy={highlight.youtube_privacy}
             youtubePublishAt={highlight.youtube_publish_at}
             uploadedAt={highlight.uploaded_at}
-            renderedAt={highlight.rendered_at}
             postizUrl={highlight.postiz_url}
             postizImportedAt={highlight.postiz_imported_at}
             postizState={highlight.postiz_state}
@@ -467,7 +421,6 @@ export const ClipDetail: React.FC = () => {
             hasOverlay={hasTitle}
             onEditOverlay={() => setIsEditingOverlay(true)}
             onTrim={() => setIsTrimming(true)}
-            needsRecut={needsRecut}
           />
 
           <OverlayTextEditor
@@ -483,7 +436,6 @@ export const ClipDetail: React.FC = () => {
             }}
             value={overlay}
             onChange={setOverlayDraft}
-            isBurned={!!highlight.overlay_burned}
             isLocked={captions?.overlay_locked ?? false}
           />
           <ClipTrimmer
@@ -499,16 +451,7 @@ export const ClipDetail: React.FC = () => {
             sourceUrl={sourceUrl}
             aspectRatio={aspectRatio}
             label={label}
-            isRendered={isRendered}
-            // No re-cut passed: this page's own Regenerate button owns that job
-            // and reports it, so the dialog points at it rather than starting a
-            // second one it could not report on.
           />
-          {isRendered && hasTitle && overlay.enabled && !highlight.overlay_burned && (
-            <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              This title is not in the rendered file yet. Regenerate the clip to burn it in.
-            </p>
-          )}
 
           <section style={{ display: 'flex', flexDirection: 'column' }}>
             {/* No heading above this one: the panel button is itself labelled
@@ -525,11 +468,6 @@ export const ClipDetail: React.FC = () => {
                 overlay={projectMetadata.settings?.overlay}
               />
             </div>
-            {isRendered && (
-              <p style={{ margin: 'var(--space-sm) 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                This clip is already rendered. Re-run the clipper to apply caption changes to the file.
-              </p>
-            )}
           </section>
         </section>
       </div>

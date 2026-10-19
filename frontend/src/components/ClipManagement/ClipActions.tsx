@@ -4,7 +4,6 @@ import { getClipPublication, getStudioEditUrl, type UploadPrivacy } from '../../
 import { formatPublishAt } from '../../utils/uploadSchedule';
 import { Button } from '../Button';
 import { ConfirmationModal } from '../ConfirmationModal';
-import { describeRequestFailure, useClipRender } from '../../hooks/useClipRender';
 import { useClipUpload } from '../../hooks/useClipUpload';
 import { useClipPostiz } from '../../hooks/useClipPostiz';
 
@@ -13,12 +12,6 @@ interface ClipActionsProps {
   clipIndex: number;
   /** What the upload will be called on YouTube, so the confirmation can say. */
   clipTitle?: string;
-  /**
-   * False while the clip is still only a preview, with no file on disk. It no
-   * longer gates the upload — publishing cuts the clip itself — and only
-   * decides whether the render button offers a first cut or another one.
-   */
-  isRendered?: boolean;
   /**
    * Where this clip already lives on YouTube, when it has been published.
    *
@@ -41,11 +34,6 @@ interface ClipActionsProps {
    * told from one that gave up: the job leaves `/active_processes` either way.
    */
   uploadedAt?: string | null;
-  /**
-   * When the current file was written, which is how a finished re-cut is told
-   * from one that fell over: the job leaves `/active_processes` either way.
-   */
-  renderedAt?: string | null;
   /**
    * Where this clip's Postiz post sits, once it has been imported. Unlike the
    * YouTube record this points at a draft on the user's own calendar, so the
@@ -72,26 +60,17 @@ interface ClipActionsProps {
   hasOverlay?: boolean;
   /** Opens the trimmer: where in the source this clip starts and ends. */
   onTrim?: () => void;
-  /**
-   * True when the window has moved since the file was cut.
-   *
-   * A trim renders nothing, so the file can be playing footage the timecodes no
-   * longer describe. The button says so rather than leaving it to be noticed.
-   */
-  needsRecut?: boolean;
 }
 
 export const ClipActions: React.FC<ClipActionsProps> = ({
   projectId,
   clipIndex,
   clipTitle,
-  isRendered = true,
   youtubeUrl,
   youtubeVideoId,
   youtubePrivacy,
   youtubePublishAt,
   uploadedAt,
-  renderedAt,
   postizUrl,
   postizImportedAt,
   postizState,
@@ -99,7 +78,6 @@ export const ClipActions: React.FC<ClipActionsProps> = ({
   onEditOverlay,
   hasOverlay = false,
   onTrim,
-  needsRecut = false,
 }) => {
   const queryClient = useQueryClient();
 
@@ -131,19 +109,9 @@ export const ClipActions: React.FC<ClipActionsProps> = ({
   const [isConfirming, setIsConfirming] = useState(false);
   const [actionResult, setActionResult] = useState<{ ok: boolean; message: string } | null>(null);
 
-  // The re-cut itself lives in a hook, because the clip card on the project
-  // page offers the same action and the two have to agree about when a render
-  // is running and what finishing means.
-  const { isRendering, start: startRender } = useClipRender({
-    projectId,
-    clipIndex,
-    renderedAt,
-    onFinished: setActionResult,
-  });
-
-  // Publishing is watched the same way a re-cut is, because it now starts with
-  // one: the clip is cut afresh so the video that goes up is the video the page
-  // was showing, which takes far longer than a request can be held open.
+  // Publishing is watched until it finishes, because it starts with a cut: the
+  // clip is cut afresh so the video that goes up is the video the page was
+  // showing, which takes far longer than a request can be held open.
   const { isUploading, start: startUpload } = useClipUpload({
     projectId,
     clipIndex,
@@ -165,11 +133,6 @@ export const ClipActions: React.FC<ClipActionsProps> = ({
     if (isImporting) return;
     setActionResult(null);
     void startPostizImport();
-  };
-
-  const handleRegenerate = () => {
-    setActionResult(null);
-    void startRender();
   };
 
   const handleUpload = () => {
@@ -204,7 +167,7 @@ export const ClipActions: React.FC<ClipActionsProps> = ({
         style={rowStyle}
         onClick={() => setIsConfirming(true)}
         // Available for a clip nobody has rendered: the upload cuts it first.
-        disabled={isUploading || isRendering || isImporting}
+        disabled={isUploading || isImporting}
       >
         {isUploading
           ? 'Rendering, then uploading…'
@@ -213,9 +176,8 @@ export const ClipActions: React.FC<ClipActionsProps> = ({
             : 'Upload to YouTube'}
       </Button>
       {isUploading && (
-        // The same promise the re-cut makes, and worth repeating here: the job
-        // is the backend's, so a user who navigates away has not cancelled a
-        // publish halfway through.
+        // The job is the backend's, so a user who navigates away has not
+        // cancelled a publish halfway through.
         <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--text-muted)' }}>
           Cutting the clip again, then publishing it. This keeps going if you leave the page.
         </p>
@@ -268,8 +230,8 @@ export const ClipActions: React.FC<ClipActionsProps> = ({
         size="sm"
         style={rowStyle}
         onClick={handlePostizImport}
-        // Every one of these cuts this same clip into the same file.
-        disabled={isImporting || isUploading || isRendering}
+        // Both of these cut this same clip into the same file.
+        disabled={isImporting || isUploading}
       >
         {isImporting
           ? 'Rendering, then importing…'
@@ -329,48 +291,16 @@ export const ClipActions: React.FC<ClipActionsProps> = ({
           ))}
         </ul>
       )}
-      {/* Always available, whether or not there is a file yet: this is the one
-          action that turns the settings on this page — captions, the title, the
-          project's aspect ratio — into an actual clip. */}
-      <Button
-        variant="ghost"
-        size="sm"
-        style={rowStyle}
-        onClick={handleRegenerate}
-        // An upload or a Postiz import is cutting this same clip, into the
-        // same file.
-        disabled={isRendering || isUploading || isImporting}
-      >
-        {isRendering ? 'Rendering this clip…' : isRendered ? 'Regenerate clip' : 'Render this clip'}
-      </Button>
-      {isRendering && (
-        // The encode outlives this page, so leaving is safe and worth saying:
-        // a user who navigates away has not cancelled anything.
-        <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-          Cutting and encoding the clip. This keeps going if you leave the page.
-        </p>
-      )}
       {/* Subtitles are not a button here any more: the Captions panel below
-          styles them and the clipper burns them in. A disabled "Add Subtitles
+          styles them and the cut burns them in. A disabled "Add Subtitles
           (not available yet)" next to working caption controls only reads as
           the feature being broken. */}
       <Button variant="ghost" size="sm" style={rowStyle} onClick={onEditOverlay}>
         {hasOverlay ? 'Edit overlay text' : 'Add overlay text'}
       </Button>
       {onTrim && (
-        // Accent when the file has fallen behind the window, the same mark the
-        // grid card puts on this, and the words say it too rather than leaving
-        // a colour to carry it alone.
-        <Button
-          variant="ghost"
-          size="sm"
-          style={{
-            ...rowStyle,
-            ...(needsRecut ? { color: 'var(--accent)', borderColor: 'var(--accent)' } : {}),
-          }}
-          onClick={onTrim}
-        >
-          {needsRecut ? 'Trim — moved since this was cut' : 'Trim start and end'}
+        <Button variant="ghost" size="sm" style={rowStyle} onClick={onTrim}>
+          Trim start and end
         </Button>
       )}
 

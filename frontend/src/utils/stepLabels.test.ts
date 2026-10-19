@@ -3,7 +3,7 @@ import { stepLabel } from './stepLabels';
 
 describe('stepLabel', () => {
   it('names steps after what they produce, not the code that runs them', () => {
-    expect(stepLabel('clipper')).toBe('Clips');
+    expect(stepLabel('postiz')).toBe('Postiz Drafts');
     // This step writes ten titles and a social post for each; "Metadata"
     // described the payload shape, not the output.
     expect(stepLabel('metadata')).toBe('Titles & Posts');

@@ -1,6 +1,6 @@
 """The project's layout: crop, or the whole frame stacked between darkened copies."""
 
-from backend.src.dataclasses.data import Highlight, ProjectSettings
+from backend.src.dataclasses.data import ProjectSettings
 
 
 def test_a_project_saved_before_layouts_existed_crops():
@@ -42,8 +42,3 @@ def test_split_defaults_and_junk():
     assert ProjectSettings.from_dict({"split_position": 95}).split_position == 80
     assert ProjectSettings.from_dict({"split_position": "left"}).split_position == 50
     assert ProjectSettings.from_dict({"split_swap": "yes"}).split_swap is False
-
-
-def test_a_highlight_records_its_layout():
-    highlight = Highlight.from_json({"start": 0, "end": 1, "rendered_layout": "stacked"})
-    assert Highlight.from_json(highlight.to_dict()).rendered_layout == "stacked"
