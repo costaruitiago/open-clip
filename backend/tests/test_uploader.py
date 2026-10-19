@@ -10,6 +10,7 @@ import pytest
 
 from backend.src.dataclasses.data import Project
 from backend.src.orchestrator import ClipRegenerationInProgressError, PipelineOrchestrator
+from backend.src.settings_manager import settings_manager
 from backend.src.services.uploader import (
     ClipFileMissingError,
     ClipNotRenderedError,
@@ -714,6 +715,29 @@ def test_a_clip_keeps_its_slot_however_it_was_published(project_root):
     assert publish(project_dir, settings, index=1)["publish_at"] == (
         scheduling_uploader(project_dir, settings).publish_at(Project(PROJECT_ID), 1)
     )
+
+
+def test_clips_are_scheduled_by_score_not_by_position(project_root, monkeypatch):
+    # 4 moments, a cutoff of 50: the clips are positions 1 and 3, and the
+    # better of them goes first. Neither waits behind the moments under the
+    # cutoff, which is what scheduling by position did.
+    monkeypatch.setattr(settings_manager, "settings", {"jev_min_score": 0.5})
+    project_dir = write_project(project_root, [
+        highlight(jev_scores={"relative": 0.1}),
+        highlight(jev_scores={"relative": 0.6}),
+        highlight(jev_scores={"relative": 0.2}),
+        highlight(jev_scores={"relative": 0.9}),
+    ])
+    settings = {
+        "youtube_privacy": "schedule",
+        "youtube_schedule_start_date": "2026-08-25",
+        "youtube_schedule_per_day": 1,
+        "youtube_schedule_day_start_hour": 9,
+    }
+    service = scheduling_uploader(project_dir, settings)
+
+    assert service.publish_at(Project(PROJECT_ID), 3) == "2026-08-25T07:00:00Z"
+    assert service.publish_at(Project(PROJECT_ID), 1) == "2026-08-26T07:00:00Z"
 
 
 def test_a_day_that_has_already_begun_starts_the_run_tomorrow(project_root):

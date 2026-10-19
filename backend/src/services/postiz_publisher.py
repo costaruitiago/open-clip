@@ -666,7 +666,7 @@ class PostizPublisher:
         draft sits on the calendar the user is about to look at — which is the
         whole point of spacing them.
 
-        Keyed on the clip's own position rather than on the order things
+        Keyed on the clip's rank by score rather than on the order things
         happened in, so the same clip lands on the same slot whichever way it
         was imported: the whole-project step or one button on one card.
         Re-importing a clip moves it nowhere.
@@ -678,7 +678,11 @@ class PostizPublisher:
         # disagree about what it was asked.
         return _as_postiz_date(
             slot_time(
-                self._schedule_start(project), index, self.per_day(project), first_hour, last_hour
+                self._schedule_start(project),
+                highlight_options.schedule_slot(project, index),
+                self.per_day(project),
+                first_hour,
+                last_hour,
             )
         )
 
@@ -1220,7 +1224,9 @@ class PostizPublisher:
         failures: List[str] = []
         # Only the project's clips; moments below a Jev cutoff are imported
         # one at a time from their card, never by this step.
-        selected = sorted(highlight_options.selected_indices(project))
+        # Best score first, the order they are scheduled in.
+        chosen = highlight_options.selected_indices(project)
+        selected = [i for i in highlight_options.publish_order(project) if i in chosen]
         total = len(selected)
         # Indexes, not the highlights themselves: each import is written back
         # onto its highlight, which reloads the list from disk.

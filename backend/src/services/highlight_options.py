@@ -12,7 +12,7 @@ The resolved numbers reach the prompt as `{min_clips}`, `{max_clips}`,
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Optional, Set, Tuple
+from typing import Any, List, Optional, Set, Tuple
 
 from backend.src.dataclasses.data import (
     HIGHLIGHT_MAX_CLIPS,
@@ -181,6 +181,34 @@ def selected_indices(project: Project) -> Set[int]:
     # 50 is never on the wrong side of a cutoff of 50.
     cutoff = round(jev_min_score(project) * 100)
     return {i for i, score in scored.items() if round(score * 100) >= cutoff} | unscored
+
+
+def publish_order(project: Project) -> List[int]:
+    """Every highlight, by position, in the order they go out.
+
+    The project's clips first, best score first, then the moments below the
+    cutoff the same way — the order the page lists them in
+    (`frontend/src/components/ProjectDetail/ProjectDetail.tsx`). A highlight
+    without a Jev score counts as 0, and a tie keeps the highlights' own order.
+    """
+    selected = selected_indices(project)
+
+    def score(index: int) -> float:
+        scores = getattr(project.highlights[index], "jev_scores", None)
+        value = jev_display_score(scores) if isinstance(scores, dict) else None
+        return value if isinstance(value, (int, float)) else 0.0
+
+    return sorted(range(len(project.highlights)), key=lambda i: (i not in selected, -score(i)))
+
+
+def schedule_slot(project: Project, index: int) -> int:
+    """Where the highlight at `index` falls on a schedule: 0 goes out first.
+
+    Its rank in `publish_order`, not its position in the list — the eighth
+    best clip of 86 moments is the eighth to go out, not the 86th.
+    """
+    order = publish_order(project)
+    return order.index(index) if index in order else index
 
 
 def format_seconds(value: float) -> str:

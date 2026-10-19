@@ -170,7 +170,7 @@ class Uploader:
         state the field means anything in: a video that goes up public has
         nothing left to publish.
 
-        Keyed on the clip's own position rather than on the order the uploads
+        Keyed on the clip's rank by score rather than on the order the uploads
         happened in, so the same clip lands on the same slot whether the whole
         project went up at once or one card's button was pressed twice.
         Re-publishing a clip moves nothing.
@@ -179,7 +179,11 @@ class Uploader:
             return None
         first_hour, last_hour = self._day_window(project)
         when = slot_time(
-            self._schedule_start(project), index, self.per_day(project), first_hour, last_hour
+            self._schedule_start(project),
+            highlight_options.schedule_slot(project, index),
+            self.per_day(project),
+            first_hour,
+            last_hour,
         )
         return (
             when.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -466,7 +470,9 @@ class Uploader:
         # first — it only needs the source video and the highlights. Moments
         # below a Jev cutoff are not the project's clips and are never
         # published by this step; each can still be published from its card.
-        selected = sorted(highlight_options.selected_indices(project))
+        # Best score first, the order they are scheduled in.
+        chosen = highlight_options.selected_indices(project)
+        selected = [i for i in highlight_options.publish_order(project) if i in chosen]
         total = len(selected)
         #
         # Indexes, not the highlights themselves: each upload is written back
