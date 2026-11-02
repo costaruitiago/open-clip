@@ -28,11 +28,12 @@ from the browser at all.
 import json
 import logging
 import os
+import re
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from urllib.parse import parse_qs, urlparse
 
 from google.oauth2.credentials import Credentials
@@ -51,6 +52,14 @@ SCOPES = [
     "https://www.googleapis.com/auth/youtube.force-ssl",
 ]
 DEFAULT_TOKEN_PATH = Path("backend/youtube_credentials/youtube_credentials.json")
+# One token per channel. A refresh token is issued for the one channel picked on
+# Google's consent screen, so publishing to a second channel takes a second
+# consent and a second token; each is named by the channel id it belongs to.
+CHANNELS_DIR = DEFAULT_TOKEN_PATH.parent / "channels"
+# The single token from before there could be more than one. It still uploads,
+# so it is listed as a channel of its own rather than thrown away; connecting
+# again stores a named one beside it.
+LEGACY_CHANNEL_ID = "legacy"
 DEFAULT_CALLBACK_PORT = 8090
 CALLBACK_HOST = os.environ.get("OAUTH_CALLBACK_HOST", "localhost")
 
@@ -167,13 +176,83 @@ def stored_scopes(token_path: Path = DEFAULT_TOKEN_PATH) -> list:
     return list(granted) if granted else list(SCOPES)
 
 
-def save_credentials(creds: Credentials, token_path: Path = DEFAULT_TOKEN_PATH) -> Path:
+def save_credentials(creds: Credentials, token_path: Path = DEFAULT_TOKEN_PATH,
+                     channel_title: Optional[str] = None) -> Path:
     token_path.parent.mkdir(parents=True, exist_ok=True)
-    token_path.write_text(creds.to_json(), encoding="utf-8")
+    stored = json.loads(creds.to_json())
+    # Kept in the token file rather than beside it: the credentials loader
+    # ignores keys it does not know, and one file per channel cannot drift.
+    if channel_title is not None:
+        stored["channel_title"] = channel_title
+    token_path.write_text(json.dumps(stored), encoding="utf-8")
     # A refusal is about the token being replaced here, not about this one.
     rejection_path(token_path).unlink(missing_ok=True)
     logger.info(f"Stored YouTube credentials at {token_path}")
     return token_path
+
+
+def channel_token_path(channel_id: str, channels_dir: Path = CHANNELS_DIR) -> Path:
+    """Where the token for one channel lives.
+
+    The id arrives from the page, so anything that is not the shape YouTube
+    issues is refused rather than joined onto a path.
+    """
+    if channel_id == LEGACY_CHANNEL_ID:
+        return DEFAULT_TOKEN_PATH
+    if not channel_id or not re.fullmatch(r"[A-Za-z0-9_-]+", channel_id):
+        raise ValueError(f"Not a YouTube channel id: {channel_id!r}")
+    return channels_dir / f"{channel_id}.json"
+
+
+def list_channels(channels_dir: Path = CHANNELS_DIR,
+                  legacy_path: Path = DEFAULT_TOKEN_PATH) -> List[Dict[str, Any]]:
+    """Every connected channel, with whether its token can still be used."""
+    channels = []
+    for path in sorted(channels_dir.glob("*.json")):
+        try:
+            title = json.loads(path.read_text(encoding="utf-8")).get("channel_title")
+        except Exception:
+            title = None
+        channels.append({"id": path.stem, "title": title or path.stem, **token_status(path)})
+    if legacy_path.exists():
+        channels.append({
+            "id": LEGACY_CHANNEL_ID,
+            "title": "Original channel",
+            **token_status(legacy_path),
+        })
+    return channels
+
+
+def remove_channel(channel_id: str, channels_dir: Path = CHANNELS_DIR) -> bool:
+    """Forgets a channel's token. False when there was none to forget.
+
+    Only the copy here: the grant itself stays on the Google account until it
+    is revoked there, which nothing in this app needs.
+    """
+    path = channel_token_path(channel_id, channels_dir)
+    existed = path.exists()
+    path.unlink(missing_ok=True)
+    rejection_path(path).unlink(missing_ok=True)
+    return existed
+
+
+def own_channel(creds: Credentials) -> Tuple[str, str]:
+    """The id and title of the channel these credentials were issued for."""
+    import googleapiclient.discovery
+
+    service = googleapiclient.discovery.build("youtube", "v3", credentials=creds)
+    items = service.channels().list(part="snippet", mine=True).execute().get("items") or []
+    if not items:
+        # The usual cause is a channel this account only manages through
+        # YouTube Studio's Permissions: the API does not honour those, so the
+        # token belongs to the account itself, which has no channel.
+        raise YoutubeAuthError(
+            "Google connected an account that has no channel of its own. After picking the "
+            "account, Google asks which channel to use: pick the channel there. A channel you "
+            "were only added to through YouTube Studio's Permissions cannot be connected; its "
+            "owner has to connect it, or make you a manager of its Brand Account."
+        )
+    return items[0]["id"], items[0]["snippet"]["title"]
 
 
 CONSENT_PAGE = """<!doctype html>
@@ -241,8 +320,9 @@ class YoutubeAuthSession:
     DEFAULT_TIMEOUT_SECONDS = 300
 
     def __init__(self, client_config: Dict[str, Any], port: int = DEFAULT_CALLBACK_PORT,
-                 token_path: Path = DEFAULT_TOKEN_PATH,
-                 timeout_seconds: Optional[float] = None):
+                 channels_dir: Path = CHANNELS_DIR,
+                 timeout_seconds: Optional[float] = None,
+                 find_channel: Callable[[Credentials], Tuple[str, str]] = own_channel):
         from google_auth_oauthlib.flow import InstalledAppFlow
 
         # What it asks for, and what it got. They differ when something else
@@ -250,7 +330,10 @@ class YoutubeAuthSession:
         # often — and the difference is nobody's business but this session's.
         self.preferred_port = port
         self.port = port
-        self.token_path = token_path
+        self.channels_dir = channels_dir
+        # Asked once the token is in hand, because only Google knows which of
+        # the account's channels was picked on the consent screen.
+        self.find_channel = find_channel
         self.timeout_seconds = (
             self.DEFAULT_TIMEOUT_SECONDS if timeout_seconds is None else timeout_seconds
         )
@@ -283,8 +366,12 @@ class YoutubeAuthSession:
         # No `include_granted_scopes`: it makes Google return every scope this
         # account ever granted the client, and oauthlib then refuses the token
         # exchange with "Scope has changed", so reconnecting never saves a token.
+        # `select_account` makes Google ask which account — and so which of
+        # its channels — every time. Without it a browser already signed in
+        # goes straight to that account's own channel, and a second channel
+        # can never be connected.
         url, self._state = self._flow.authorization_url(
-            access_type="offline", prompt="consent"
+            access_type="offline", prompt="select_account consent"
         )
         return url
 
@@ -348,7 +435,11 @@ class YoutubeAuthSession:
             return
 
         self._flow.fetch_token(code=query["code"])
-        save_credentials(self._flow.credentials, self.token_path)
+        creds = self._flow.credentials
+        channel_id, title = self.find_channel(creds)
+        # The same channel connected again replaces its token: that is how a
+        # refused or under-scoped one is fixed.
+        save_credentials(creds, channel_token_path(channel_id, self.channels_dir), title)
         self.completed = True
 
     def cancel(self, timeout: float = 5) -> None:

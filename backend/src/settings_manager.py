@@ -17,6 +17,7 @@ SECRET_KEYS = {
     "gemini_api_key",
     "youtube_client_secrets",
     "postiz_channels",
+    "youtube_channel",
 }
 
 # Content that belongs to whoever runs the install: descriptions, copy

@@ -43,17 +43,24 @@ describe('SettingsPage YouTube channel', () => {
   it('says a token short of the read scope is connected, and why that matters', async () => {
     vi.spyOn(api, 'getYoutubeStatus').mockResolvedValue({
       connected: true,
-      account: 'someone@example.com',
-      missing_scopes: ['https://www.googleapis.com/auth/youtube.readonly'],
+      channels: [{
+        id: 'UC-one',
+        title: 'Main Channel',
+        connected: true,
+        account: 'someone@example.com',
+        missing_scopes: ['https://www.googleapis.com/auth/youtube.readonly'],
+      }],
+      default_channel: 'UC-one',
       has_client_secrets: true,
     });
 
     await renderPage();
 
-    expect(await screen.findByText(/Connected as someone@example.com/)).toBeInTheDocument();
+    expect(await screen.findByText('Main Channel')).toBeInTheDocument();
+    expect(screen.getByText(/Connected as someone@example.com/)).toBeInTheDocument();
     expect(screen.getByText(/Missing permission/)).toBeInTheDocument();
     // Uploads are unaffected, so the button is an offer rather than a demand.
-    expect(screen.getByRole('button', { name: /Reconnect Channel/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /Connect Another Channel/i })).toBeEnabled();
   });
 
   it('shows a refused authorisation as the error it is', async () => {
@@ -61,10 +68,16 @@ describe('SettingsPage YouTube channel', () => {
     // the page said "Connected", and every upload failed.
     vi.spyOn(api, 'getYoutubeStatus').mockResolvedValue({
       connected: false,
-      expired: true,
-      reason:
-        'YouTube has rejected the stored authorisation for this channel: invalid_grant: ' +
-        'Token has been expired or revoked. Open Settings and connect the channel again.',
+      channels: [{
+        id: 'UC-one',
+        title: 'Main Channel',
+        connected: false,
+        expired: true,
+        reason:
+          'YouTube has rejected the stored authorisation for this channel: invalid_grant: ' +
+          'Token has been expired or revoked. Open Settings and connect the channel again.',
+      }],
+      default_channel: 'UC-one',
       has_client_secrets: true,
     });
 
@@ -72,13 +85,30 @@ describe('SettingsPage YouTube channel', () => {
 
     const reason = await screen.findByText(/YouTube has rejected the stored authorisation/);
     expect(reason).toHaveStyle({ color: 'var(--error)' });
-    expect(screen.getByRole('button', { name: /Connect Channel/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /Connect Another Channel/i })).toBeEnabled();
+  });
+
+  it('disconnects a channel once the user confirms', async () => {
+    vi.spyOn(api, 'getYoutubeStatus').mockResolvedValue({
+      connected: true,
+      channels: [{ id: 'UC-one', title: 'Main Channel', connected: true }],
+      default_channel: 'UC-one',
+      has_client_secrets: true,
+    });
+    const remove = vi.spyOn(api, 'removeYoutubeChannel').mockResolvedValue({ status: 'deleted' });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    await renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Disconnect' }));
+
+    await waitFor(() => expect(remove).toHaveBeenCalledWith('UC-one', expect.anything()));
   });
 
   it('opens the consent Google returns in a tab of its own', async () => {
     vi.spyOn(api, 'getYoutubeStatus').mockResolvedValue({
       connected: false,
-      reason: 'No YouTube account has been connected yet.',
+      channels: [],
+      default_channel: null,
       has_client_secrets: true,
     });
     const connect = vi
@@ -105,6 +135,8 @@ describe('SettingsPage YouTube channel', () => {
     // and simply opens another window.
     vi.spyOn(api, 'getYoutubeStatus').mockResolvedValue({
       connected: false,
+      channels: [],
+      default_channel: null,
       has_client_secrets: true,
       consent: { pending: true, completed: false, cancelled: false, error: null },
     });
@@ -124,6 +156,8 @@ describe('SettingsPage YouTube channel', () => {
   it('can abandon a consent left waiting', async () => {
     vi.spyOn(api, 'getYoutubeStatus').mockResolvedValue({
       connected: false,
+      channels: [],
+      default_channel: null,
       has_client_secrets: true,
       consent: { pending: true, completed: false, cancelled: false, error: null },
     });
@@ -142,7 +176,8 @@ describe('SettingsPage YouTube channel', () => {
     } as never);
     vi.spyOn(api, 'getYoutubeStatus').mockResolvedValue({
       connected: false,
-      reason: 'No YouTube account has been connected yet.',
+      channels: [],
+      default_channel: null,
       has_client_secrets: false,
     });
 
@@ -172,9 +207,23 @@ describe('SettingsPage upload privacy', () => {
   beforeEach(() => {
     vi.spyOn(api, 'getYoutubeStatus').mockResolvedValue({
       connected: true,
+      channels: [
+        { id: 'UC-one', title: 'Main Channel', connected: true },
+        { id: 'UC-two', title: 'Side Channel', connected: true },
+      ],
+      default_channel: 'UC-one',
       has_client_secrets: true,
       privacy: 'private',
     });
+  });
+
+  it('saves the channel a project with none of its own uploads to', async () => {
+    const update = vi.spyOn(api, 'updateSettings').mockResolvedValue({} as never);
+
+    await renderPage();
+    fireEvent.change(await screen.findByLabelText('Default channel'), { target: { value: 'UC-two' } });
+
+    await saved(update, { youtube_channel: 'UC-two' });
   });
 
   it('starts on private, which is the one that reaches nobody by accident', async () => {

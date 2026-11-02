@@ -31,8 +31,9 @@ from backend.src.infrastructure.youtube_client import MissingCredentialsError
 from backend.src.infrastructure.youtube_auth import (
     YoutubeAuthError,
     YoutubeAuthSession,
+    list_channels,
     normalize_client_config,
-    token_status,
+    remove_channel,
 )
 from backend.src.services.captions import CaptionService
 from backend.src.services.uploader import (
@@ -230,13 +231,21 @@ class SimpleHandler(BaseHTTPRequestHandler):
         })
 
     def handle_get_youtube_status(self):
-        """Whether a channel is connected, and what it was allowed to do.
+        """Every connected channel, what each was allowed to do, and the default.
 
-        `missing_scopes` is what the page shows: a token authorised before a
-        scope was added still uploads, so this is not a broken connection, and
-        reconnecting is the only thing that can grant it.
+        `missing_scopes` on a channel is what the page shows: a token authorised
+        before a scope was added still uploads, so this is not a broken
+        connection, and reconnecting is the only thing that can grant it.
         """
-        status = token_status()
+        channels = list_channels()
+        status = {
+            "channels": channels,
+            "connected": any(channel.get("connected") for channel in channels),
+            # The channel a project with no opinion uploads to: the one chosen
+            # in Settings, or the first connected when none was.
+            "default_channel": settings_manager.get("youtube_channel")
+            or (channels[0]["id"] if channels else None),
+        }
         status["has_client_secrets"] = bool(settings_manager.get("youtube_client_secrets"))
         # What an upload makes when a project has no opinion, so the panel on a
         # project can name the default it is following rather than say "the
@@ -342,6 +351,23 @@ class SimpleHandler(BaseHTTPRequestHandler):
             session.cancel()
         prune_finished_consents()
         self.send_json_response({"status": "success"})
+
+    def handle_delete_youtube_channel(self):
+        """Forgets a connected channel. Projects that picked it keep the choice,
+        and their uploads say the channel is not connected until it is again."""
+        channel_id = self.path.split('/')[-1]
+        try:
+            removed = remove_channel(channel_id)
+        except ValueError as e:
+            self.send_cors_error(400, str(e))
+            return
+        if not removed:
+            self.send_cors_error(404, "No such channel is connected.")
+            return
+        # A default that names a channel nobody can upload to is no default.
+        if settings_manager.get("youtube_channel") == channel_id:
+            settings_manager.set("youtube_channel", None)
+        self.send_json_response({"status": "deleted"})
 
     def handle_get_projects(self):
         all_projects = []
@@ -1190,7 +1216,9 @@ class SimpleHandler(BaseHTTPRequestHandler):
     # DELETE Handlers
     def do_DELETE(self):
         logger.info(f"DELETE {self.path}")
-        if self.path.startswith('/project/') and '/clip/' in self.path:
+        if self.path.startswith('/youtube/channels/'):
+            self.handle_delete_youtube_channel()
+        elif self.path.startswith('/project/') and '/clip/' in self.path:
             parts = self.path.split('/')
             project_id = parts[2]
             try:

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getSettings, updateSettings, getResolutionMap, getAspectRatioMap, getCaptionStyles, getDescriptionFields, getYoutubeStatus, connectYoutube, cancelYoutubeConnect, getPostizStatus, type SettingsResponse, type UploadPrivacy } from '../api';
+import { getSettings, updateSettings, getResolutionMap, getAspectRatioMap, getCaptionStyles, getDescriptionFields, getYoutubeStatus, connectYoutube, cancelYoutubeConnect, removeYoutubeChannel, getPostizStatus, type SettingsResponse, type UploadPrivacy } from '../api';
 import { useDebounce } from '../hooks/useDebounce';
 import { DescriptionFieldHelp } from './DescriptionFieldHelp';
 import { DateField } from './DateField';
@@ -19,6 +19,7 @@ import {
   SHIPPED_HIGHLIGHT_DEFAULTS,
   type HighlightNumberField,
 } from '../utils/highlightOptions';
+import { stepLabel } from '../utils/stepLabels';
 
 /** Fields that mean something in a Postiz post and nothing in a description. */
 const POSTIZ_FIELDS = [
@@ -283,6 +284,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
   const cancelMutation = useMutation({
     mutationFn: cancelYoutubeConnect,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['youtubeStatus'] }),
+  });
+
+  const removeChannelMutation = useMutation({
+    mutationFn: removeYoutubeChannel,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['youtubeStatus'] });
+      // Removing the default channel clears it on the backend.
+      queryClient.invalidateQueries({ queryKey: ['settings'] });
+    },
   });
 
   const updateMutation = useMutation({
@@ -834,35 +844,59 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
 
   const youtubeTab = (
     <>
-      {/* The client secrets say which Google project may ask; this is the
-          one-time consent that lets it publish. */}
-      <Card title="Channel">
-        {/* A channel that was connected and has since been refused reads as an
-            error, not as a neutral "not connected": nothing on this page
-            changed, the uploads simply stopped working. */}
-        <span
-          style={
-            youtube && !youtube.connected && youtube.expired
-              ? errorStyle
-              : { fontSize: '0.9rem' }
-          }
-        >
-          {youtube?.connected
-            ? `Connected${youtube.account ? ` as ${youtube.account}` : ''}`
-            : (youtube?.reason || 'No channel connected.')}
-        </span>
-
-        {/* Not an error: uploads work without either. Readonly is how a clip
-            notices its video was deleted on YouTube; force-ssl is how
-            regenerating on Upload takes the old video down. */}
-        {youtube?.connected && (youtube.missing_scopes?.length ?? 0) > 0 && (
-          <span style={errorStyle}>
-            Missing permission: {youtube.missing_scopes?.join(', ')}.{' '}
-            {youtube.missing_scopes?.some((scope) => scope.endsWith('youtube.readonly')) &&
-              'A clip whose video has been deleted on YouTube cannot be noticed, so its page keeps a dead link. '}
-            {youtube.missing_scopes?.some((scope) => scope.endsWith('youtube.force-ssl')) &&
-              'Regenerating on Upload cannot replace a clip’s old video. '}
-            Reconnect to grant it.
+      {/* The client secrets say which Google project may ask; each channel
+          here is a consent that lets it publish there. One per channel: Google
+          issues a token for the channel picked on its consent screen. */}
+      <Card title="Channels">
+        {youtube && youtube.channels.length === 0 && (
+          <span style={{ fontSize: '0.9rem' }}>No channel connected.</span>
+        )}
+        {youtube?.channels.map((channel) => (
+          <div
+            key={channel.id}
+            style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-xs)' }}
+          >
+            <div style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.9rem', fontWeight: 'bold', flex: 1 }}>{channel.title}</span>
+              <button
+                type="button"
+                className="text-action"
+                onClick={() => {
+                  if (window.confirm(`Disconnect ${channel.title}? Projects that upload to it will fail until it is connected again.`)) {
+                    removeChannelMutation.mutate(channel.id);
+                  }
+                }}
+                disabled={removeChannelMutation.isPending}
+              >
+                Disconnect
+              </button>
+            </div>
+            {/* A channel that was connected and has since been refused reads
+                as an error, not as a neutral "not connected": nothing on this
+                page changed, the uploads simply stopped working. */}
+            <span style={!channel.connected && channel.expired ? errorStyle : hintStyle}>
+              {channel.connected
+                ? `Connected${channel.account ? ` as ${channel.account}` : ''}`
+                : (channel.reason || 'Not connected.')}
+            </span>
+            {/* Not an error: uploads work without either. Readonly is how a
+                clip notices its video was deleted on YouTube; force-ssl is how
+                regenerating on Upload takes the old video down. */}
+            {channel.connected && (channel.missing_scopes?.length ?? 0) > 0 && (
+              <span style={errorStyle}>
+                Missing permission: {channel.missing_scopes?.join(', ')}.{' '}
+                {channel.missing_scopes?.some((scope) => scope.endsWith('youtube.readonly')) &&
+                  'A clip whose video has been deleted on YouTube cannot be noticed, so its page keeps a dead link. '}
+                {channel.missing_scopes?.some((scope) => scope.endsWith('youtube.force-ssl')) &&
+                  'Regenerating on Upload cannot replace a clip’s old video. '}
+                Connect this channel again to grant it.
+              </span>
+            )}
+          </div>
+        ))}
+        {removeChannelMutation.isError && (
+          <span style={{ fontSize: '0.8rem', color: 'var(--error)' }}>
+            {(removeChannelMutation.error as Error).message}
           </span>
         )}
 
@@ -893,7 +927,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
           >
             {youtube?.consent?.pending
               ? 'Open Sign-in Again'
-              : youtube?.connected ? 'Reconnect Channel' : 'Connect Channel'}
+              : youtube?.channels.length ? 'Connect Another Channel' : 'Connect Channel'}
           </button>
           {youtube?.consent?.pending && (
             <button
@@ -919,6 +953,29 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
           choice is here rather than on the button that does it — and a project
           may still disagree with it. */}
       <Card title="Publishing">
+        {(youtube?.channels.length ?? 0) > 1 && (
+          <Field
+            label="Default channel"
+            htmlFor="youtube-channel"
+            hint="Where a project uploads unless it picks a channel of its own."
+          >
+            <select
+              id="youtube-channel"
+              value={youtube?.default_channel ?? ''}
+              onChange={(e) =>
+                saveSettings(
+                  { settings: { youtube_channel: e.target.value } },
+                  { onSuccess: () => queryClient.invalidateQueries({ queryKey: ['youtubeStatus'] }) }
+                )
+              }
+              style={inputStyle}
+            >
+              {youtube?.channels.map((channel) => (
+                <option key={channel.id} value={channel.id}>{channel.title}</option>
+              ))}
+            </select>
+          </Field>
+        )}
         <Field
           label="Privacy"
           htmlFor="youtube-privacy"
@@ -1175,9 +1232,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
 
   const pipeline = (
     <Card title="Steps">
-      <span style={hintStyle}>The order steps run in, and which ones run by themselves.</span>
+      <span style={hintStyle}>What each step waits for, and which ones run by themselves.</span>
       <div style={{ display: 'flex', flexDirection: 'column' }}>
-        {pipelineConfig.execution_order?.map((step: string, index: number) => (
+        {pipelineConfig.execution_order?.map((step: string) => {
+          // Named and gated the way the project page shows them. Steps are not
+          // a sequence: two steps waiting on the same one run side by side.
+          const dependsOn: string[] = pipelineConfig.steps?.[step]?.depends_on ?? [];
+          return (
           <div key={step} style={{
             display: 'flex',
             alignItems: 'center',
@@ -1185,8 +1246,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
             padding: 'var(--space-sm) 0',
             borderBottom: 'var(--border)',
           }}>
-            <span style={{ width: '24px', fontWeight: 'bold', fontSize: '1rem', opacity: 0.6 }}>{index + 1}.</span>
-            <span style={{ flex: 1, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>{step}</span>
+            <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <span style={{ fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>{stepLabel(step)}</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                {dependsOn.length ? `After ${dependsOn.map(stepLabel).join(' and ')}` : 'Runs first'}
+              </span>
+            </span>
             <label style={{
               display: 'flex',
               alignItems: 'center',
@@ -1212,7 +1277,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
               Auto-run
             </label>
           </div>
-        ))}
+          );
+        })}
       </div>
     </Card>
   );

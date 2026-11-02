@@ -349,7 +349,7 @@ def publishing_orchestrator(project_dir, client, clipper=None) -> PipelineOrches
     service = uploader(
         project_dir,
         clipper=clipper or FakeClipper(project_dir),
-        client_factory=lambda: client,
+        client_factory=lambda _path: client,
     )
     return PipelineOrchestrator(config_path=str(PIPELINE_CONFIG), services={"upload": service})
 
@@ -394,7 +394,7 @@ def test_an_authorisation_that_cannot_publish_is_refused_before_anything_is_cut(
     service = uploader(
         project_dir,
         clipper=clipper,
-        client_factory=lambda: (_ for _ in ()).throw(RuntimeError("No credentials.")),
+        client_factory=lambda _path: (_ for _ in ()).throw(RuntimeError("No credentials.")),
     )
     orchestrator = PipelineOrchestrator(
         config_path=str(PIPELINE_CONFIG), services={"upload": service}
@@ -483,7 +483,7 @@ def test_regenerating_replaces_every_clip_s_video(project_root):
     ])
     client = FakeYoutube()
 
-    assert len(run_step(uploader(project_dir, client_factory=lambda: client), replace=True)) == 2
+    assert len(run_step(uploader(project_dir, client_factory=lambda _path: client), replace=True)) == 2
 
     assert len(client.calls) == 2
     assert client.deleted == ["vid-old"]
@@ -500,7 +500,7 @@ def test_regenerating_without_delete_permission_publishes_nothing(project_root):
     client = FakeYoutube()
     client.deletable = False
 
-    assert run_step(uploader(project_dir, client_factory=lambda: client), replace=True) == []
+    assert run_step(uploader(project_dir, client_factory=lambda _path: client), replace=True) == []
 
     assert client.calls == []
     metadata = read_metadata()
@@ -515,7 +515,7 @@ def test_an_old_video_that_will_not_delete_is_reported_on_the_clip(project_root)
     client = FakeYoutube()
     client.delete_error = RuntimeError("quota exceeded")
 
-    run_step(uploader(project_dir, client_factory=lambda: client), replace=True)
+    run_step(uploader(project_dir, client_factory=lambda _path: client), replace=True)
 
     stored = read_metadata()["highlights"][0]
     # The new cut is live, so this is not a failed upload — but the old one
@@ -533,7 +533,7 @@ def test_a_second_press_publishes_only_the_clips_with_no_video(project_root):
         highlight(),
     ])
     client = FakeYoutube()
-    service = uploader(project_dir, client_factory=lambda: client)
+    service = uploader(project_dir, client_factory=lambda _path: client)
 
     assert len(run_step(service)) == 1
 
@@ -551,14 +551,14 @@ def test_a_full_run_publishes_every_clip(project_root):
     ])
     client = FakeYoutube()
 
-    assert len(run_step(uploader(project_dir, client_factory=lambda: client), full=True)) == 2
+    assert len(run_step(uploader(project_dir, client_factory=lambda _path: client), full=True)) == 2
     assert len(client.calls) == 2
 
 
 def test_a_run_that_publishes_some_of_the_clips_is_partial(project_root):
     project_dir = write_project(project_root, [highlight(), highlight()])
     client = FakeYoutube()
-    service = uploader(project_dir, client_factory=lambda: client)
+    service = uploader(project_dir, client_factory=lambda _path: client)
     original = service.upload_one
 
     def flaky(project, index, **kwargs):
@@ -580,7 +580,7 @@ def test_a_run_that_publishes_nothing_fails_the_step(project_root):
     project_dir = write_project(project_root, [highlight()])
     service = uploader(
         project_dir,
-        client_factory=lambda: FakeYoutube(),
+        client_factory=lambda _path: FakeYoutube(),
         clipper=FakeClipper(project_dir, error=RuntimeError("ffmpeg fell over")),
     )
 
@@ -851,3 +851,51 @@ def test_a_video_that_is_gone_takes_its_schedule_with_it(project_root):
     stored = read_metadata()["highlights"][0]
     assert stored["youtube_privacy"] is None
     assert stored["youtube_publish_at"] is None
+
+
+# --- Which channel -----------------------------------------------------------
+
+
+def opened_paths(project_dir: Path, app_settings=None):
+    """An uploader that records which channel's token each client was opened with."""
+    paths = []
+
+    def factory(path):
+        paths.append(path)
+        return FakeYoutube()
+
+    return scheduling_uploader(project_dir, app_settings, client_factory=factory), paths
+
+
+def test_a_project_uploads_to_the_channel_it_picked(project_root):
+    project_dir = write_project(project_root, [highlight()], upload={"channel_id": "UC-mine"})
+    service, paths = opened_paths(project_dir, {"youtube_channel": "UC-default"})
+
+    service.upload_one(Project(PROJECT_ID), 0)
+
+    assert paths[-1].name == "UC-mine.json"
+    assert read_metadata()["highlights"][0]["youtube_channel_id"] == "UC-mine"
+
+
+def test_a_project_that_picked_no_channel_uploads_to_the_default(project_root):
+    project_dir = write_project(project_root, [highlight()])
+    service, paths = opened_paths(project_dir, {"youtube_channel": "UC-default"})
+
+    service.upload_one(Project(PROJECT_ID), 0)
+
+    assert paths[-1].name == "UC-default.json"
+
+
+def test_a_published_video_is_checked_on_the_channel_it_went_up_on(project_root):
+    # Moving the project to another channel must not make its private videos
+    # look deleted: only their own channel can see them.
+    project_dir = write_project(
+        project_root,
+        [highlight(youtube_video_id="vid-1", youtube_channel_id="UC-old")],
+        upload={"channel_id": "UC-new"},
+    )
+    service, paths = opened_paths(project_dir)
+
+    service.verify_publication(Project(PROJECT_ID), 0)
+
+    assert paths[-1].name == "UC-old.json"

@@ -278,6 +278,11 @@ class Highlight:
     # hour comes, and only this says which is which.
     youtube_privacy: Optional[str] = None
     youtube_publish_at: Optional[str] = None
+    # The channel the video went up on. The project may be moved to another
+    # channel afterwards, and only this channel's token can see a private video
+    # or delete it. None for a clip published before there could be more than
+    # one channel.
+    youtube_channel_id: Optional[str] = None
     # Why the last publish attempt did not produce a video, or None when the
     # last attempt worked or none has been made. Publishing runs in the
     # background — it re-cuts the clip first, which outlives a browser request —
@@ -384,6 +389,7 @@ class Highlight:
             # anything but private, which is what the reader assumes for one.
             youtube_privacy=data.get("youtube_privacy"),
             youtube_publish_at=data.get("youtube_publish_at"),
+            youtube_channel_id=data.get("youtube_channel_id"),
             upload_error=data.get("upload_error"),
             # Absent for every clip nobody has imported, which is every clip
             # written before Postiz was wired in.
@@ -759,6 +765,8 @@ class UploadSettings:
     they are kept anyway: a user who switches to private for a week and back
     should not have to type their calendar out again.
     """
+    # The connected channel this project's clips go up on, by YouTube channel id.
+    channel_id: Optional[str] = None
     privacy: Optional[str] = None
     # How many of this project's clips are published per day. 0 means all of
     # them at the same moment, which is a legitimate schedule — everything at
@@ -788,7 +796,12 @@ class UploadSettings:
         if isinstance(per_day, bool) or not isinstance(per_day, int) or per_day < 0:
             per_day = None
 
+        channel_id = data.get("channel_id")
+        if not isinstance(channel_id, str) or not channel_id:
+            channel_id = None
+
         return cls(
+            channel_id=channel_id,
             privacy=privacy,
             per_day=per_day,
             start_date=_as_start_date(data.get("start_date")),

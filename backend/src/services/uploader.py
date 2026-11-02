@@ -4,6 +4,11 @@ from typing import Callable, Dict, Any, List, Optional, Tuple
 from pathlib import Path
 from backend.src.dataclasses.data import UPLOAD_PRIVACY_CHOICES, Highlight, Project
 from backend.src.infrastructure.progress import report
+from backend.src.infrastructure.youtube_auth import (
+    DEFAULT_TOKEN_PATH,
+    channel_token_path,
+    list_channels,
+)
 from backend.src.infrastructure.youtube_client import YoutubeClient
 from backend.src.services import highlight_options
 from backend.src.services.clipper import Clipper
@@ -48,14 +53,15 @@ class UploadInProgressError(Exception):
 
 
 class Uploader:
-    def __init__(self, client_factory: Optional[Callable[[], YoutubeClient]] = None,
+    def __init__(self, client_factory: Optional[Callable[[Path], YoutubeClient]] = None,
                  clipper: Optional[Clipper] = None,
                  settings_reader: Optional[Callable[[str, Any], Any]] = None,
                  now: Optional[Callable[[], datetime]] = None):
         # Held because publishing a clip means producing the file first, not
         # finding one somebody else left behind.
         self.clipper = clipper or Clipper()
-        self.client_factory = client_factory or YoutubeClient
+        # Handed the token file of the channel an upload goes to.
+        self.client_factory = client_factory or (lambda path: YoutubeClient(str(path)))
         self._settings_reader = settings_reader
         # Local time, with its offset attached: the hours a user picks are the
         # hours on their own clock, and YouTube is told the same instant in UTC.
@@ -84,6 +90,22 @@ class Uploader:
         """
         settings = getattr(project, "settings", None)
         return getattr(settings, "upload", None)
+
+    def channel_id(self, project: Optional[Project] = None) -> Optional[str]:
+        """The channel this project's clips go up on.
+
+        The project's choice, then the application's, then the first channel
+        connected — with one channel there is nothing to choose. None when no
+        channel is connected at all.
+        """
+        own = self._project_upload(project)
+        if own is not None and own.channel_id:
+            return str(own.channel_id)
+        default = self._setting("youtube_channel", None)
+        if default:
+            return str(default)
+        channels = list_channels()
+        return channels[0]["id"] if channels else None
 
     def privacy(self, project: Optional[Project] = None) -> str:
         """What this project's uploads are on YouTube: the four the user picks from.
@@ -223,14 +245,21 @@ class Uploader:
     def clip_path(self, project: Project, highlight: Highlight) -> Path:
         return Path(project.base_directory) / project.project_id / "clips" / highlight.generated_clip_filename
 
-    def open_client(self) -> YoutubeClient:
+    def open_client(self, project: Optional[Project] = None,
+                    channel_id: Optional[str] = None) -> YoutubeClient:
         """Opens the handle an upload will go through.
 
         Called before anything is cut, so a missing or expired authorisation is
         reported as itself and at once, rather than after minutes of encoding
         spent on an upload that was never going to happen.
+
+        `channel_id` names a channel outright — the one a published video is
+        on — instead of the one the project uploads to now.
         """
-        return self.client_factory()
+        channel = channel_id or self.channel_id(project)
+        # No channel at all still goes through the client, which is what says
+        # there is nothing connected.
+        return self.client_factory(channel_token_path(channel) if channel else DEFAULT_TOKEN_PATH)
 
     def begin_attempt(self, project: Project, index: int) -> None:
         """Clears the last failure, because this attempt is about to replace it."""
@@ -273,6 +302,7 @@ class Uploader:
         # afterwards and the video on YouTube cannot.
         highlights[index].youtube_privacy = result.get("privacy")
         highlights[index].youtube_publish_at = result.get("publish_at")
+        highlights[index].youtube_channel_id = result.get("channel_id")
         # Whatever the previous attempt failed with is no longer true of this
         # clip, and a live video sitting next to an error message reads as one.
         highlights[index].upload_error = None
@@ -303,7 +333,7 @@ class Uploader:
 
         # Before the render, not after: an authorisation that cannot upload is
         # worth knowing about now rather than at the end of an encode.
-        client = client or self.client_factory()
+        client = client or self.open_client(project)
 
         self.clipper.render_one(project, index)
         # Re-read: the render writes the filename and the timestamp onto the
@@ -351,6 +381,8 @@ class Uploader:
         )
         result["privacy"] = privacy
         result["publish_at"] = scheduled_for
+        # The client was opened for the project's channel, so that is where it went.
+        result["channel_id"] = self.channel_id(project)
         logger.info(
             f"Uploader uploaded clip={highlight.generated_clip_filename}, "
             f"video_id={result.get('video_id')}"
@@ -381,7 +413,9 @@ class Uploader:
         if not highlight.youtube_video_id:
             return False
 
-        client = client or self.open_client()
+        # The channel the video is on, not the one the project uploads to now:
+        # a private video is invisible to every other channel's token.
+        client = client or self.open_client(project, highlight.youtube_channel_id)
         exists = client.video_exists(highlight.youtube_video_id)
         if exists is None:
             return None
@@ -404,6 +438,7 @@ class Uploader:
         highlight.uploaded_at = None
         highlight.youtube_privacy = None
         highlight.youtube_publish_at = None
+        highlight.youtube_channel_id = None
         highlight.upload_error = None
         project.set_property("highlights", highlights)
 
@@ -416,10 +451,15 @@ class Uploader:
         not a failed upload, but the old one has to come down by hand.
         """
         old_id = project.highlights[index].youtube_video_id
+        old_channel = project.highlights[index].youtube_channel_id
         result = self.upload_one(project, index, client=client)
         if old_id and old_id != result.get("video_id"):
             try:
-                client.delete_video(old_id)
+                # The old video may be on a channel the project has since moved
+                # away from, and only that channel can take it down.
+                same_channel = old_channel in (None, result.get("channel_id"))
+                deleter = client if same_channel else self.open_client(project, old_channel)
+                deleter.delete_video(old_id)
                 logger.info(f"Replaced {old_id} with {result.get('video_id')} for clip {index}")
             except Exception as e:
                 self._set_upload_error(
@@ -449,7 +489,7 @@ class Uploader:
         # doing that per clip is both slower and one more thing to fail halfway.
         # Through the factory rather than `YoutubeClient()` directly, so this
         # loop can be driven in a test without an OAuth token.
-        client = self.open_client()
+        client = self.open_client(project)
 
         # Refused before anything is cut or published: without the delete
         # permission every replacement would be a duplicate.

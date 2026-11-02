@@ -43,6 +43,8 @@ beforeEach(() => {
   vi.spyOn(api, 'getDescriptionFields').mockResolvedValue({} as never);
   vi.spyOn(api, 'getYoutubeStatus').mockResolvedValue({
     connected: false,
+    channels: [],
+    default_channel: null,
     has_client_secrets: true,
   });
 });

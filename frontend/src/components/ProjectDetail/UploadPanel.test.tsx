@@ -11,6 +11,11 @@ vi.mock('../../api', async (importOriginal) => {
     updateProjectSettings: vi.fn(async () => ({ status: 'ok' })),
     getYoutubeStatus: vi.fn(async () => ({
       connected: true,
+      channels: [
+        { id: 'UC-one', title: 'Main Channel', connected: true },
+        { id: 'UC-two', title: 'Side Channel', connected: true },
+      ],
+      default_channel: 'UC-one',
       has_client_secrets: true,
       // What Settings says, which is what a project follows until it disagrees.
       privacy: 'unlisted' as const,
@@ -20,6 +25,7 @@ vi.mock('../../api', async (importOriginal) => {
 
 /** A project that has no opinion about anything, which is every new project. */
 const FOLLOWING: UploadProjectSettings = {
+  channel_id: null,
   privacy: null,
   per_day: null,
   start_date: null,
@@ -35,7 +41,7 @@ const open = async (settings?: Partial<UploadProjectSettings>) => {
   );
   fireEvent.click(screen.getByRole('button', { name: /YouTube/ }));
   await waitFor(() => expect(getYoutubeStatus).toHaveBeenCalled());
-  await screen.findByLabelText(/What an upload makes/);
+  await screen.findByLabelText(/Visibility/);
 };
 
 describe('UploadPanel', () => {
@@ -48,7 +54,7 @@ describe('UploadPanel', () => {
 
     expect(screen.getByText('Default')).toBeDefined();
     await waitFor(() =>
-      expect(screen.getByRole('option', { name: /Whatever Settings says.*Unlisted/ })).toBeDefined()
+      expect(screen.getByRole('option', { name: /Default: Unlisted/ })).toBeDefined()
     );
     expect(updateProjectSettings).not.toHaveBeenCalled();
   });
@@ -56,7 +62,7 @@ describe('UploadPanel', () => {
   it('gives the project its own privacy when one is picked', async () => {
     await open();
 
-    fireEvent.change(screen.getByLabelText(/What an upload makes/), { target: { value: 'public' } });
+    fireEvent.change(screen.getByLabelText(/Visibility/), { target: { value: 'public' } });
 
     await waitFor(() =>
       expect(updateProjectSettings).toHaveBeenCalledWith('p1', { upload: { privacy: 'public' } })
@@ -67,7 +73,7 @@ describe('UploadPanel', () => {
     await open({ privacy: 'public' });
 
     expect(screen.getByText('Public')).toBeDefined();
-    fireEvent.change(screen.getByLabelText(/What an upload makes/), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText(/Visibility/), { target: { value: '' } });
 
     await waitFor(() =>
       expect(updateProjectSettings).toHaveBeenCalledWith('p1', { upload: { privacy: null } })
@@ -94,18 +100,18 @@ describe('UploadPanel', () => {
   it('asks for a calendar only when the clips are scheduled', async () => {
     await open({ privacy: 'private' });
 
-    expect(screen.queryByLabelText(/First clip goes public on/)).toBeNull();
+    expect(screen.queryByLabelText(/Start date/)).toBeNull();
 
-    fireEvent.change(screen.getByLabelText(/What an upload makes/), { target: { value: 'schedule' } });
+    fireEvent.change(screen.getByLabelText(/Visibility/), { target: { value: 'schedule' } });
     await waitFor(() => expect(updateProjectSettings).toHaveBeenCalled());
   });
 
   it('shows the calendar to a project whose own privacy is a schedule', async () => {
     await open({ privacy: 'schedule', start_date: '2026-09-01' });
 
-    expect(screen.getByLabelText(/First clip goes public on/)).toHaveValue('2026-09-01');
+    expect(screen.getByLabelText(/Start date/)).toHaveValue('2026-09-01');
 
-    fireEvent.change(screen.getByLabelText(/First clip goes public on/), {
+    fireEvent.change(screen.getByLabelText(/Start date/), {
       target: { value: '2026-09-08' },
     });
 
@@ -119,18 +125,20 @@ describe('UploadPanel', () => {
   it('shows the calendar to a project following a scheduled default', async () => {
     vi.mocked(getYoutubeStatus).mockResolvedValueOnce({
       connected: true,
+      channels: [],
+      default_channel: null,
       has_client_secrets: true,
       privacy: 'schedule',
     });
 
     await open();
 
-    await screen.findByLabelText(/First clip goes public on/);
+    await screen.findByLabelText(/Start date/);
   });
 
   it('sends an emptied date as following Settings rather than as a blank day', async () => {
     await open({ privacy: 'schedule', start_date: '2026-09-01' });
-    const date = screen.getByLabelText(/First clip goes public on/);
+    const date = screen.getByLabelText(/Start date/);
 
     // Cleared, then left: a date input reads empty half-typed too, so the
     // empty is only an answer once the user is out of the field.
@@ -148,12 +156,12 @@ describe('UploadPanel', () => {
   it('tells all-at-once apart from having no opinion', async () => {
     await open({ privacy: 'schedule' });
 
-    fireEvent.change(screen.getByLabelText(/How many go public per day/), { target: { value: '0' } });
+    fireEvent.change(screen.getByLabelText(/Clips per day/), { target: { value: '0' } });
     await waitFor(() =>
       expect(updateProjectSettings).toHaveBeenCalledWith('p1', { upload: { per_day: 0 } })
     );
 
-    fireEvent.change(screen.getByLabelText(/How many go public per day/), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText(/Clips per day/), { target: { value: '' } });
     await waitFor(() =>
       expect(updateProjectSettings).toHaveBeenCalledWith('p1', { upload: { per_day: null } })
     );
@@ -171,5 +179,23 @@ describe('UploadPanel', () => {
     await waitFor(() =>
       expect(updateProjectSettings).toHaveBeenCalledWith('p1', { upload: { day_end_hour: 18 } })
     );
+  });
+
+  it('names the default channel and saves a channel of its own', async () => {
+    await open();
+    const channel = screen.getByLabelText('Channel');
+
+    expect(await screen.findByRole('option', { name: /Default: Main Channel/ })).toBeInTheDocument();
+    fireEvent.change(channel, { target: { value: 'UC-two' } });
+
+    await waitFor(() =>
+      expect(updateProjectSettings).toHaveBeenCalledWith('p1', { upload: { channel_id: 'UC-two' } })
+    );
+  });
+
+  it('warns when the channel it picked is no longer connected', async () => {
+    await open({ channel_id: 'UC-gone' });
+
+    expect(await screen.findByText(/no longer connected. Uploads will fail/)).toBeInTheDocument();
   });
 });

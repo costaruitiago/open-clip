@@ -11,7 +11,6 @@ import {
 } from '../../api';
 import {
   HOURS,
-  MAX_SCHEDULE_YEARS_AHEAD,
   PER_DAY_CHOICES,
   PRIVACY_LABELS,
   earliestScheduleDate,
@@ -28,6 +27,7 @@ interface UploadPanelProps {
 }
 
 const EMPTY: UploadProjectSettings = {
+  channel_id: null,
   privacy: null,
   per_day: null,
   start_date: null,
@@ -59,6 +59,7 @@ const BADGE_LABELS: Record<UploadPrivacy, string> = {
 export const UploadPanel: React.FC<UploadPanelProps> = ({ projectId, settings, variant = 'panel' }) => {
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
+  const channelId = useId();
   const privacyId = useId();
   const startDateId = useId();
   const perDayId = useId();
@@ -66,7 +67,8 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({ projectId, settings, v
   const dayEndId = useId();
 
   // Asked only while the dialog is open: all this page wants from it is the
-  // default to name, and it is a round trip that says nothing otherwise.
+  // channels to pick from and the defaults to name, and it is a round trip
+  // that says nothing otherwise.
   const { data: youtube } = useQuery({
     queryKey: ['youtubeStatus'],
     queryFn: getYoutubeStatus,
@@ -90,6 +92,16 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({ projectId, settings, v
   // that follows a scheduled default is on a schedule.
   const effective: UploadPrivacy = stored.privacy ?? appPrivacy;
 
+  const channels = youtube?.channels ?? [];
+  const channelTitle = (id: string | null | undefined) =>
+    channels.find((channel) => channel.id === id)?.title ?? id;
+  // A channel this project picked and Settings has since disconnected is kept
+  // as an option, so the select shows what uploads will fail on.
+  const missingChannel =
+    youtube && stored.channel_id && !channels.some((channel) => channel.id === stored.channel_id)
+      ? stored.channel_id
+      : null;
+
   // Everything this project decided for itself. The privacy is only one of the
   // five: a project that follows the default privacy but publishes on its own
   // calendar is not following Settings, and the badge said it was.
@@ -103,7 +115,8 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({ projectId, settings, v
   const badgeLabel = () => {
     if (chosen.length === 0) return 'Default';
     if (chosen.length > 1) return `${chosen.length} chosen`;
-    return stored.privacy ? BADGE_LABELS[stored.privacy] : '1 chosen';
+    if (stored.privacy) return BADGE_LABELS[stored.privacy];
+    return stored.channel_id ? 'Own channel' : '1 chosen';
   };
 
   const badge = (
@@ -161,10 +174,52 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({ projectId, settings, v
         </button>
       )}
 
-      <Modal isOpen={isOpen} title="YouTube for this project" onClose={() => setIsOpen(false)} maxWidth="620px">
+      <Modal isOpen={isOpen} title="YouTube upload settings" onClose={() => setIsOpen(false)} maxWidth="620px">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
-            <label htmlFor={privacyId} style={labelStyle}>What an upload makes</label>
+            {/* A dropdown with one entry is not a choice, so one channel is
+                stated rather than offered. */}
+            {channels.length > 1 || missingChannel ? (
+              <>
+                <label htmlFor={channelId} style={labelStyle}>Channel</label>
+                <select
+                  id={channelId}
+                  value={stored.channel_id ?? ''}
+                  onChange={(e) => mutation.mutate({ channel_id: e.target.value || null })}
+                  style={fieldStyle}
+                >
+                  <option value="">
+                    Default{youtube?.default_channel ? `: ${channelTitle(youtube.default_channel)}` : ''}
+                  </option>
+                  {channels.map((channel) => (
+                    <option key={channel.id} value={channel.id}>{channel.title}</option>
+                  ))}
+                  {missingChannel && (
+                    <option value={missingChannel}>{missingChannel} (not connected)</option>
+                  )}
+                </select>
+                {missingChannel && (
+                  <span style={{ ...hintStyle, color: 'var(--error)' }}>
+                    This channel is no longer connected. Uploads will fail until you pick another
+                    or connect it again in Settings.
+                  </span>
+                )}
+              </>
+            ) : (
+              <>
+                <span style={labelStyle}>Channel</span>
+                <span style={{ fontSize: '0.9rem' }}>
+                  {channels.length === 1 ? channels[0].title : 'No channel connected'}
+                </span>
+                <span style={hintStyle}>
+                  To upload somewhere else, connect another channel in Settings → YouTube.
+                </span>
+              </>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
+            <label htmlFor={privacyId} style={labelStyle}>Visibility</label>
             <select
               id={privacyId}
               value={stored.privacy ?? ''}
@@ -173,17 +228,12 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({ projectId, settings, v
               }
               style={fieldStyle}
             >
-              <option value="">
-                Whatever Settings says ({PRIVACY_LABELS[appPrivacy] ?? appPrivacy})
-              </option>
+              <option value="">Default: {PRIVACY_LABELS[appPrivacy] ?? appPrivacy}</option>
               {(Object.keys(PRIVACY_LABELS) as UploadPrivacy[]).map((value) => (
                 <option key={value} value={value}>{PRIVACY_LABELS[value]}</option>
               ))}
             </select>
-            <span style={hintStyle}>
-              A scheduled clip goes up private with a publish time on it; YouTube turns it public
-              itself when the time comes. Nothing here changes a clip that is already published.
-            </span>
+            <span style={hintStyle}>Applies to new uploads only.</span>
           </div>
 
           {/* Only under a schedule, for the same reason as in Settings: these
@@ -191,7 +241,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({ projectId, settings, v
           {effective === 'schedule' && (
             <>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
-                <label htmlFor={startDateId} style={labelStyle}>First clip goes public on</label>
+                <label htmlFor={startDateId} style={labelStyle}>Start date</label>
                 <DateField
                   id={startDateId}
                   value={stored.start_date ?? ''}
@@ -200,15 +250,11 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({ projectId, settings, v
                   max={latestScheduleDate()}
                   style={fieldStyle}
                 />
-                <span style={hintStyle}>
-                  Empty follows Settings, and Settings with no date publishes as soon as the
-                  upload is done. Today at the earliest — YouTube refuses a publish time behind
-                  it — and at most {MAX_SCHEDULE_YEARS_AHEAD} years out.
-                </span>
+                <span style={hintStyle}>Empty uses the default. No default means as soon as uploaded.</span>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
-                <label htmlFor={perDayId} style={labelStyle}>How many go public per day</label>
+                <label htmlFor={perDayId} style={labelStyle}>Clips per day</label>
                 <select
                   id={perDayId}
                   // An empty string is "follow Settings" and 0 is "all at the
@@ -218,19 +264,15 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({ projectId, settings, v
                   onChange={(e) => numberChange('per_day')(e.target.value)}
                   style={fieldStyle}
                 >
-                  <option value="">Whatever Settings says</option>
+                  <option value="">Default</option>
                   {PER_DAY_CHOICES.map((choice) => (
                     <option key={choice.value} value={choice.value}>{choice.label}</option>
                   ))}
                 </select>
-                <span style={hintStyle}>
-                  A clip keeps its slot however it was published, so publishing one card on its
-                  own puts it where the whole run would have.
-                </span>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
-                <span style={labelStyle}>Spread between</span>
+                <span style={labelStyle}>Publish between</span>
                 <div style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'center' }}>
                   <label htmlFor={dayStartId} style={{ fontSize: '0.8rem' }}>From</label>
                   <select
@@ -257,10 +299,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({ projectId, settings, v
                     ))}
                   </select>
                 </div>
-                <span style={hintStyle}>
-                  On this machine's clock. One clip a day goes out at the first hour; the rest of
-                  a day's clips are spaced evenly up to the last.
-                </span>
+                <span style={hintStyle}>Your local time.</span>
               </div>
             </>
           )}
@@ -276,19 +315,21 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({ projectId, settings, v
             schedule fields travel whether or not this project is scheduled, for
             the same reason they are kept here: a calendar somebody typed out is
             not thrown away for a week on private. */}
-        <PromoteToDefaults
-          build={() => {
-            const next: Record<string, unknown> = {};
-            if (stored.privacy) next.youtube_privacy = stored.privacy;
-            if (stored.per_day !== null) next.youtube_schedule_per_day = stored.per_day;
-            if (stored.start_date) next.youtube_schedule_start_date = stored.start_date;
-            if (stored.day_start_hour !== null) next.youtube_schedule_day_start_hour = stored.day_start_hour;
-            if (stored.day_end_hour !== null) next.youtube_schedule_day_end_hour = stored.day_end_hour;
-            return next;
-          }}
-          hint="This becomes what every upload makes, unless the project says otherwise. It changes nothing already published, and nothing already scheduled on YouTube."
-          emptyHint="This project follows Settings for everything here, so there is nothing of its own to promote."
-        />
+        {chosen.length > 0 && (
+          <PromoteToDefaults
+            build={() => {
+              const next: Record<string, unknown> = {};
+              if (stored.channel_id) next.youtube_channel = stored.channel_id;
+              if (stored.privacy) next.youtube_privacy = stored.privacy;
+              if (stored.per_day !== null) next.youtube_schedule_per_day = stored.per_day;
+              if (stored.start_date) next.youtube_schedule_start_date = stored.start_date;
+              if (stored.day_start_hour !== null) next.youtube_schedule_day_start_hour = stored.day_start_hour;
+              if (stored.day_end_hour !== null) next.youtube_schedule_day_end_hour = stored.day_end_hour;
+              return next;
+            }}
+            hint="Makes this project's choices the default for every project."
+          />
+        )}
       </Modal>
     </>
   );

@@ -14,10 +14,14 @@ import pytest
 from google.oauth2.credentials import Credentials
 
 from backend.src.infrastructure.youtube_auth import (
+    LEGACY_CHANNEL_ID,
     SCOPES,
     YoutubeAuthError,
     YoutubeAuthSession,
+    channel_token_path,
+    list_channels,
     normalize_client_config,
+    remove_channel,
     stored_scopes,
     token_status,
 )
@@ -144,14 +148,14 @@ def settle(session, timeout: float = 5):
 
 def started_session(tmp_path, **overrides):
     session = YoutubeAuthSession(
-        CLIENT_CONFIG, port=free_port(), token_path=tmp_path / "token.json", **overrides
+        CLIENT_CONFIG, port=free_port(), channels_dir=tmp_path, **overrides
     )
     session.start()
     return session
 
 
 def test_the_redirect_google_sends_back_becomes_a_stored_token(tmp_path, monkeypatch):
-    session = started_session(tmp_path)
+    session = started_session(tmp_path, find_channel=lambda creds: ("UC-one", "The Channel"))
     fetched = {}
     # What the exchange would have produced. `credentials` is read-only on the
     # flow, so it is stood in for rather than assigned.
@@ -169,7 +173,41 @@ def test_the_redirect_google_sends_back_becomes_a_stored_token(tmp_path, monkeyp
     assert settle(session)
     assert fetched["code"] == "the-code"
     assert session.status()["completed"] is True
-    assert json.loads((tmp_path / "token.json").read_text())["refresh_token"] == "refresh-1"
+    stored = json.loads((tmp_path / "UC-one.json").read_text())
+    assert stored["refresh_token"] == "refresh-1"
+    assert stored["channel_title"] == "The Channel"
+
+
+def test_every_connected_channel_is_listed_by_its_title(tmp_path):
+    write_token(tmp_path, scopes=list(SCOPES))
+    (tmp_path / "youtube_credentials.json").rename(tmp_path / "UC-one.json")
+    stored = json.loads((tmp_path / "UC-one.json").read_text())
+    (tmp_path / "UC-one.json").write_text(json.dumps({**stored, "channel_title": "One"}))
+
+    channels = list_channels(tmp_path, legacy_path=tmp_path / "missing.json")
+
+    assert [(c["id"], c["title"], c["connected"]) for c in channels] == [("UC-one", "One", True)]
+
+
+def test_the_token_from_before_channels_is_still_a_channel(tmp_path):
+    legacy = write_token(tmp_path, scopes=list(SCOPES))
+
+    channels = list_channels(tmp_path / "channels", legacy_path=legacy)
+
+    assert [c["id"] for c in channels] == [LEGACY_CHANNEL_ID]
+
+
+def test_a_removed_channel_takes_its_token_with_it(tmp_path):
+    (tmp_path / "UC-one.json").write_text("{}")
+
+    assert remove_channel("UC-one", tmp_path) is True
+    assert not (tmp_path / "UC-one.json").exists()
+    assert remove_channel("UC-one", tmp_path) is False
+
+
+def test_a_channel_id_cannot_reach_outside_the_channels_folder(tmp_path):
+    with pytest.raises(ValueError):
+        channel_token_path("../secrets", tmp_path)
 
 
 def test_a_browser_asking_for_something_else_does_not_end_the_wait(tmp_path):
@@ -208,7 +246,7 @@ def test_a_consent_nobody_finishes_can_be_cancelled(tmp_path):
     # it should stop rather than sit on a socket until its deadline.
     port = free_port()
     session = YoutubeAuthSession(
-        CLIENT_CONFIG, port=port, token_path=tmp_path / "token.json"
+        CLIENT_CONFIG, port=port, channels_dir=tmp_path
     )
     session.start()
     assert session.is_pending()
@@ -226,10 +264,10 @@ def test_a_second_consent_starts_while_the_first_is_still_waiting(tmp_path):
     # The whole point: pressing the button again opens another window. The
     # first attempt is not in the way and is not something to be told about.
     port = free_port()
-    first = YoutubeAuthSession(CLIENT_CONFIG, port=port, token_path=tmp_path / "token.json")
+    first = YoutubeAuthSession(CLIENT_CONFIG, port=port, channels_dir=tmp_path)
     first.start()
 
-    second = YoutubeAuthSession(CLIENT_CONFIG, port=port, token_path=tmp_path / "token.json")
+    second = YoutubeAuthSession(CLIENT_CONFIG, port=port, channels_dir=tmp_path)
     url = second.start()
 
     assert first.is_pending() and second.is_pending()
@@ -246,7 +284,7 @@ def test_the_usual_port_is_taken_when_it_is_free(tmp_path):
     # Docker publishes one port, and an attempt on any other is unreachable
     # from the browser, so the preferred one is always tried first.
     port = free_port()
-    session = YoutubeAuthSession(CLIENT_CONFIG, port=port, token_path=tmp_path / "token.json")
+    session = YoutubeAuthSession(CLIENT_CONFIG, port=port, channels_dir=tmp_path)
     session.start()
 
     assert session.port == port
@@ -258,7 +296,7 @@ def test_a_consent_left_alone_gives_up_by_itself(tmp_path):
     # is restarted, and every retry is refused for a tab nobody has open.
     port = free_port()
     session = YoutubeAuthSession(
-        CLIENT_CONFIG, port=port, token_path=tmp_path / "token.json", timeout_seconds=0.2
+        CLIENT_CONFIG, port=port, channels_dir=tmp_path, timeout_seconds=0.2
     )
     session.start()
 
@@ -274,7 +312,7 @@ def test_a_consent_left_alone_gives_up_by_itself(tmp_path):
 def test_cancelling_a_consent_that_already_ended_does_nothing(tmp_path):
     port = free_port()
     session = YoutubeAuthSession(
-        CLIENT_CONFIG, port=port, token_path=tmp_path / "token.json"
+        CLIENT_CONFIG, port=port, channels_dir=tmp_path
     )
     session.start()
     session.cancel()
@@ -293,7 +331,7 @@ def test_a_port_something_else_holds_does_not_stop_a_consent(tmp_path):
         port = held.getsockname()[1]
 
         session = YoutubeAuthSession(
-            CLIENT_CONFIG, port=port, token_path=tmp_path / "token.json"
+            CLIENT_CONFIG, port=port, channels_dir=tmp_path
         )
         session.start()
 

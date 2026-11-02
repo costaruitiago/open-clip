@@ -94,8 +94,8 @@ class YoutubeClient:
                     raise MissingCredentialsError(message) from e
             else:
                 raise MissingCredentialsError(
-                    "No usable YouTube credentials. Authorise a channel so "
-                    f"{credentials_path} holds a token that can still be refreshed, then upload again."
+                    "No usable YouTube credentials for this channel. Connect it in Settings, "
+                    "or pick a connected channel for the project, then upload again."
                 )
         
         self.scopes = list(creds.scopes or [])

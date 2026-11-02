@@ -33,6 +33,11 @@ export const Modal: React.FC<ModalProps> = ({
 }) => {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
+  // Callers pass `onClose` inline, so it is a new function on every render.
+  // Depending on it re-ran the effect below on any re-render of the caller,
+  // which pulled focus out of whatever field was being typed in.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -50,7 +55,7 @@ export const Modal: React.FC<ModalProps> = ({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== 'Tab') return;
@@ -73,7 +78,7 @@ export const Modal: React.FC<ModalProps> = ({
       document.removeEventListener('keydown', handleKeyDown);
       previouslyFocused?.focus();
     };
-  }, [isOpen, onClose, initialFocusRef]);
+  }, [isOpen, initialFocusRef]);
 
   if (!isOpen) return null;
 

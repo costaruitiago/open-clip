@@ -307,6 +307,8 @@ export type UploadPrivacy = 'private' | 'unlisted' | 'public' | 'schedule';
  * the calendar they typed.
  */
 export type UploadProjectSettings = {
+  /** The connected channel this project's clips go up on, by YouTube channel id. */
+  channel_id: string | null;
   privacy: UploadPrivacy | null;
   /** How many clips are published per day. 0 is all at the same moment. */
   per_day: number | null;
@@ -464,6 +466,9 @@ export type SettingsResponse = {
     // default — is the only one of the four that cannot reach an audience by
     // accident, and is what an upload did before there was a choice.
     youtube_privacy?: UploadPrivacy;
+    // The channel a project with no channel of its own uploads to, by YouTube
+    // channel id. Unset is the first channel connected.
+    youtube_channel?: string | null;
     // The schedule a `schedule` upload publishes on, read on this machine's
     // clock. Only these three shape it: how many clips a day, the day it
     // starts, and the hours of that day they are spread between.
@@ -783,13 +788,23 @@ export const updateSettings = async (payload: { settings: any, pipeline_config?:
  * YouTube — without it a deleted video leaves its record behind, and the clip
  * page goes on offering a dead link.
  */
-export type YoutubeStatus = {
+export type YoutubeChannel = {
+  id: string;
+  title: string;
   connected: boolean;
   reason?: string;
   expired?: boolean;
   has_refresh_token?: boolean;
   account?: string | null;
   missing_scopes?: string[];
+};
+
+export type YoutubeStatus = {
+  /** True when any channel can upload. */
+  connected: boolean;
+  channels: YoutubeChannel[];
+  /** What a project with no channel of its own uploads to. */
+  default_channel: string | null;
   has_client_secrets: boolean;
   consent?: { pending: boolean; completed: boolean; cancelled: boolean; error: string | null };
   /** What an upload makes when a project has no opinion, so a project's own
@@ -812,6 +827,11 @@ export const getYoutubeStatus = async (): Promise<YoutubeStatus> => {
  */
 export const connectYoutube = async (): Promise<{ authorization_url: string }> => {
   return apiRequest('/youtube/connect', { method: 'POST' });
+};
+
+/** Forgets a connected channel's token. */
+export const removeYoutubeChannel = async (channelId: string): Promise<{ status: string }> => {
+  return apiRequest(`/youtube/channels/${encodeURIComponent(channelId)}`, { method: 'DELETE' });
 };
 
 /** Abandons a consent left waiting in a browser. */

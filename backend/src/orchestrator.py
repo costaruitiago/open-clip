@@ -426,7 +426,7 @@ class PipelineOrchestrator:
             self.active_processes[key] = time.time()
 
         try:
-            client = uploader.open_client()
+            client = uploader.open_client(project)
         except Exception:
             self._unregister_process(key)
             raise
