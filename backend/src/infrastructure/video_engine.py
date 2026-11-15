@@ -297,3 +297,97 @@ class OpenCVVideoEngine(VideoEngine):
         if result.returncode != 0:
             logger.error(f"ffmpeg failed for {output_path}: {result.stderr.strip()}")
             raise subprocess.CalledProcessError(result.returncode, cmd, stderr=result.stderr)
+
+
+def has_audio(input_path: str) -> bool:
+    """Whether the file carries at least one audio stream."""
+    result = subprocess.run(
+        ['ffprobe', '-v', 'error', '-select_streams', 'a', '-show_entries', 'stream=index',
+         '-of', 'csv=p=0', input_path],
+        capture_output=True, text=True,
+    )
+    return bool(result.stdout.strip())
+
+
+# The audio every part of an end-screened clip is brought to, so concat can
+# join them.
+_END_SCREEN_AUDIO = 'aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo'
+
+
+def append_end_screen(clip_path: str, image_path: str, duration: float,
+                      music_path: Optional[str] = None) -> None:
+    """Re-encodes `clip_path` in place with `image_path` held for `duration`
+    seconds at its end.
+
+    The picture is fitted inside the clip's frame on black, never cropped: an
+    end screen is usually a designed card, and its edges are where the text is.
+    The music plays only over the picture, cut to its length and faded out;
+    without music the end screen is silent. A clip with no audio of its own gets
+    silence under it, because concat needs every part to carry the same streams.
+    """
+    # ffmpeg spins forever looping a picture it cannot decode, so it is checked
+    # before the render rather than discovered by one that never ends.
+    if not probe_image(image_path):
+        raise ValueError("The end screen picture could not be read as an image. Upload it again.")
+    width, height, fps = probe_video(clip_path)
+    fade = min(1.0, duration / 2)
+    output_path = str(Path(clip_path).with_suffix('.endscreen.mp4'))
+
+    cmd = ['ffmpeg', '-y', '-nostdin', '-loglevel', 'error', '-i', clip_path,
+           '-loop', '1', '-framerate', str(fps), '-t', str(duration), '-i', image_path]
+    if music_path:
+        cmd += ['-i', music_path]
+    else:
+        cmd += ['-f', 'lavfi', '-t', str(duration), '-i', 'anullsrc=r=48000:cl=stereo']
+    clip_audio_input = None
+    if not has_audio(clip_path):
+        cmd += ['-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo']
+        clip_audio_input = 3
+
+    clip_audio = f'[{clip_audio_input}:a]atrim=0:{probe_duration(clip_path)},' if clip_audio_input else '[0:a]'
+    end_audio = f'[2:a]{_END_SCREEN_AUDIO},apad,atrim=0:{duration}'
+    if music_path:
+        end_audio += f',afade=t=out:st={duration - fade}:d={fade}'
+    graph = ';'.join([
+        '[0:v]setsar=1,format=yuv420p[v0]',
+        f'[1:v]scale={width}:{height}:force_original_aspect_ratio=decrease,'
+        f'pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={fps},format=yuv420p[v1]',
+        f'{clip_audio}{_END_SCREEN_AUDIO}[a0]',
+        f'{end_audio}[a1]',
+        '[v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]',
+    ])
+
+    codec = settings_manager.get("codec") or "libx264"
+    cmd += ['-filter_complex', graph, '-map', '[v]', '-map', '[a]', '-c:v', codec]
+    cmd += build_encoder_args(codec, width, height, fps)
+    cmd += ['-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k',
+            '-movflags', '+faststart', output_path]
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        Path(output_path).unlink(missing_ok=True)
+        logger.error(f"ffmpeg failed adding the end screen to {clip_path}: {result.stderr.strip()}")
+        raise subprocess.CalledProcessError(result.returncode, cmd, stderr=result.stderr)
+    Path(output_path).replace(clip_path)
+
+
+def probe_duration(input_path: str) -> float:
+    """The file's duration in seconds, from its container."""
+    result = subprocess.run(
+        ['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', input_path],
+        capture_output=True, text=True, check=True,
+    )
+    return float(result.stdout.strip())
+
+
+def probe_image(image_path: str) -> bool:
+    """Whether ffmpeg can decode a frame from the file.
+
+    A decode rather than a probe: ffprobe names the codec from the file
+    extension, so a broken .png probes as a png.
+    """
+    result = subprocess.run(
+        ['ffmpeg', '-v', 'error', '-nostdin', '-i', image_path, '-frames:v', '1', '-f', 'null', '-'],
+        capture_output=True, text=True,
+    )
+    return result.returncode == 0

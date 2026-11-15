@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ProjectSettingsMenu } from './ProjectSettingsMenu';
 import type { ProjectMetadata } from '../../api';
@@ -206,5 +206,49 @@ describe('ProjectSettingsMenu', () => {
     const trigger = await screen.findByRole('button', { name: /Captions/i });
     expect(trigger.textContent).toMatch(/On/);
     expect(trigger.textContent).toMatch(/2 adjusted/i);
+  });
+
+  // The render crops a stacked project whose frame is the source's own shape,
+  // and nothing on screen used to say so. jsdom loads no media, so the
+  // source's size is handed to the menu's probe the moment it is given a src.
+  const sourceSpies: { mockRestore: () => void }[] = [];
+  afterEach(() => sourceSpies.splice(0).forEach((spy) => spy.mockRestore()));
+  const withSource = (width: number, height: number) => {
+    sourceSpies.push(
+      vi.spyOn(HTMLVideoElement.prototype, 'videoWidth', 'get').mockReturnValue(width),
+      vi.spyOn(HTMLVideoElement.prototype, 'videoHeight', 'get').mockReturnValue(height),
+      vi.spyOn(HTMLMediaElement.prototype, 'src', 'set').mockImplementation(function (this: HTMLMediaElement) {
+        queueMicrotask(() => this.onloadedmetadata?.(new Event('loadedmetadata')));
+      })
+    );
+  };
+
+  it('warns that stacked does nothing while the aspect ratio keeps the original', async () => {
+    withSource(1280, 720);
+    renderMenu(metadata({ settings: { resolution: 'keep original', aspect_ratio: 'keep original', layout: 'stacked' } }));
+
+    expect(await screen.findByText(/Stacked has no effect/)).toBeDefined();
+  });
+
+  it('warns that stacked does nothing on a frame the same shape as the source', async () => {
+    withSource(1920, 1080);
+    renderMenu(metadata({ settings: { resolution: 'keep original', aspect_ratio: '16:9', layout: 'stacked' } }));
+
+    expect(await screen.findByText(/Stacked has no effect/)).toBeDefined();
+  });
+
+  it('does not warn about stacked on a frame taller than the source', async () => {
+    withSource(1920, 1080);
+    renderMenu(metadata({ settings: { resolution: 'keep original', aspect_ratio: '9:16', layout: 'stacked' } }));
+
+    await screen.findByRole('option', { name: '9:16' });
+    expect(screen.queryByText(/Stacked has no effect/)).toBeNull();
+  });
+
+  it('warns that split crops a frame that is not portrait', async () => {
+    withSource(1920, 1080);
+    renderMenu(metadata({ settings: { resolution: 'keep original', aspect_ratio: '16:9', layout: 'split' } }));
+
+    expect(await screen.findByText(/Split only applies to a portrait frame/)).toBeDefined();
   });
 });

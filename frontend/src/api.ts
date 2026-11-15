@@ -306,6 +306,21 @@ export type UploadPrivacy = 'private' | 'unlisted' | 'public' | 'schedule';
  * `schedule`, and are kept anyway — a week on private should not cost the user
  * the calendar they typed.
  */
+/**
+ * A picture held at the end of every clip in the project, with music under it.
+ * `image` and `music` are filenames in the project's end_screen directory, set
+ * by uploading the file rather than by a settings patch.
+ */
+export type EndScreenSettings = {
+  enabled: boolean;
+  image: string | null;
+  music: string | null;
+  /** Seconds, 1 to 20. */
+  duration: number;
+};
+
+export type EndScreenFileKind = 'image' | 'music';
+
 export type UploadProjectSettings = {
   /** The connected channel this project's clips go up on, by YouTube channel id. */
   channel_id: string | null;
@@ -420,6 +435,7 @@ export type ProjectMetadata = {
     postiz?: PostizProjectSettings;
     /** How this project's clips go up on YouTube, when it differs from the app's. */
     upload?: UploadProjectSettings;
+    end_screen?: EndScreenSettings;
   };
   files?: {
     original_file?: string;
@@ -701,6 +717,34 @@ export type StepActivity = {
 
 export const getExecutionStatus = async (projectId: string): Promise<Record<string, string>> => {
   return apiRequest(`/project/${projectId}/execution_status`);
+};
+
+/** Stores the project's end screen picture or music, replacing any before it. */
+export const uploadEndScreenFile = async (
+  projectId: string,
+  kind: EndScreenFileKind,
+  file: File
+): Promise<{ end_screen: EndScreenSettings }> => {
+  const response = await fetch(
+    `${BASE_URL}/project/${projectId}/end_screen/${kind}?name=${encodeURIComponent(file.name)}`,
+    { method: 'POST', body: file }
+  );
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `Upload failed with status ${response.status}`);
+  }
+  return response.json();
+};
+
+export const removeEndScreenFile = async (
+  projectId: string,
+  kind: EndScreenFileKind
+): Promise<{ end_screen: EndScreenSettings }> => {
+  return apiRequest(`/project/${projectId}/end_screen/${kind}`, { method: 'DELETE' });
+};
+
+export const getEndScreenFileUrl = (projectId: string, filename: string) => {
+  return `${BASE_URL}/projects/static/${projectId}/end_screen/${filename}`;
 };
 
 export const getSourceVideoUrl = (projectId: string, originalFile: string) => {
@@ -991,6 +1035,7 @@ export const updateProjectSettings = async (
     split_divider?: boolean;
     postiz?: Partial<PostizProjectSettings>;
     upload?: Partial<UploadProjectSettings>;
+    end_screen?: Partial<Pick<EndScreenSettings, 'enabled' | 'duration'>>;
   }
 ) => {
   return apiRequest(`/project/${projectId}/settings`, {

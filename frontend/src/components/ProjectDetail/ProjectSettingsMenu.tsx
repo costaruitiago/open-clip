@@ -4,16 +4,20 @@ import { CaptionStyler } from '../ClipManagement/CaptionStyler';
 import { OverlayStyler } from '../ClipManagement/OverlayStyler';
 import { PromoteToDefaults } from '../PromoteToDefaults';
 import { DescriptionPanel } from './DescriptionPanel';
+import { EndScreenPanel } from './EndScreenPanel';
 import { HighlightsPanel } from './HighlightsPanel';
 import { PostizPanel } from './PostizPanel';
 import { UploadPanel } from './UploadPanel';
 import {
   getAspectRatioMap,
   getResolutionMap,
+  getSourceVideoUrl,
   updateProjectSettings,
   type Layout,
   type ProjectMetadata,
 } from '../../api';
+import { splitApplies, stackBandFraction } from '../ClipManagement/StackedBands';
+import { targetAspectRatio } from '../../utils/aspectRatio';
 
 /** The project settings edited in place, in the menu. */
 type ProjectSettings = {
@@ -27,6 +31,26 @@ type ProjectSettings = {
 };
 
 const LAYOUTS: Layout[] = ['crop', 'stacked', 'split'];
+
+/** The source video's width over its height, read from its metadata; null until it loads. */
+const useSourceRatio = (url: string | null): number | null => {
+  const [ratio, setRatio] = useState<number | null>(null);
+  useEffect(() => {
+    if (!url) return;
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.onloadedmetadata = () => {
+      if (video.videoWidth && video.videoHeight) setRatio(video.videoWidth / video.videoHeight);
+    };
+    video.src = url;
+    return () => {
+      video.onloadedmetadata = null;
+      video.removeAttribute('src');
+      video.load();
+    };
+  }, [url]);
+  return ratio;
+};
 
 /**
  * One in-flight save. The label is carried along so a failure can name the
@@ -128,6 +152,24 @@ export const ProjectSettingsMenu: React.FC<ProjectSettingsMenuProps> = ({ metada
   const currentSplitPosition = pendingSettings.split_position ?? storedSettings?.split_position ?? 50;
   const currentSplitSwap = pendingSettings.split_swap ?? storedSettings?.split_swap ?? false;
   const currentSplitDivider = pendingSettings.split_divider ?? storedSettings?.split_divider ?? false;
+
+  // Stacked and split need a frame of a different shape than the source, and
+  // the render quietly crops when they do not get one — which left a project
+  // set to "stacked" cutting plain clips with nothing on screen saying why.
+  // Same tests as the preview and `build_picture_args`, against the source's
+  // real shape; "keep original" makes the frame the source's shape.
+  const sourceRatio = useSourceRatio(
+    metadata.files?.original_file ? getSourceVideoUrl(metadata.project_id, metadata.files.original_file) : null
+  );
+  const frameRatio =
+    targetAspectRatio({ resolution: currentResolution, aspect_ratio: currentAspectRatio }, aspectRatiosData, resolutionsData) ??
+    sourceRatio;
+  const layoutWarning =
+    currentLayout === 'stacked' && sourceRatio !== null && stackBandFraction(frameRatio, sourceRatio) === 0
+      ? 'Stacked has no effect with this aspect ratio: the frame is not taller than the video, so there is no room above and below it and the clips are cropped instead. Pick a portrait aspect ratio such as 9:16.'
+      : currentLayout === 'split' && frameRatio !== null && !splitApplies(frameRatio)
+        ? 'Split only applies to a portrait frame, so these clips will be cropped instead. Pick a portrait aspect ratio such as 9:16.'
+        : null;
 
   return (
     // `aria-busy` rather than `disabled` on the controls. Disabling the select
@@ -244,6 +286,12 @@ export const ProjectSettingsMenu: React.FC<ProjectSettingsMenuProps> = ({ metada
           )}
         </div>
 
+        {layoutWarning && (
+          <p role="status" style={{ margin: 'var(--space-sm) 0 0 0', fontSize: '0.8rem', color: 'var(--warning)' }}>
+            {layoutWarning}
+          </p>
+        )}
+
         {/* On its own row rather than beside the three selects: it is about all
             of them, and inside the group it would read as a fourth setting.
 
@@ -277,6 +325,11 @@ export const ProjectSettingsMenu: React.FC<ProjectSettingsMenuProps> = ({ metada
             variant="inline"
             projectId={metadata.project_id}
             overlay={metadata.settings?.overlay}
+          />
+          <EndScreenPanel
+            variant="inline"
+            projectId={metadata.project_id}
+            settings={metadata.settings?.end_screen}
           />
           <DescriptionPanel
             variant="inline"

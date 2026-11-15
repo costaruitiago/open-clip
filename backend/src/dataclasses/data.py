@@ -810,6 +810,48 @@ class UploadSettings:
         )
 
 
+# How long the end screen holds, in seconds.
+DEFAULT_END_SCREEN_DURATION = 5.0
+END_SCREEN_DURATION_RANGE = (1.0, 20.0)
+
+
+@dataclass
+class EndScreenSettings:
+    """A still picture appended to every clip of the project, with music under it.
+
+    `image` and `music` are filenames inside the project's `end_screen/`
+    directory, set by uploading the file rather than by the settings patch. The
+    music plays only over the end screen, never under the clip itself.
+    """
+    enabled: bool = False
+    image: Optional[str] = None
+    music: Optional[str] = None
+    duration: float = DEFAULT_END_SCREEN_DURATION
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Any) -> 'EndScreenSettings':
+        if not isinstance(data, dict):
+            return cls()
+
+        duration = data.get("duration")
+        if isinstance(duration, bool) or not isinstance(duration, (int, float)):
+            duration = DEFAULT_END_SCREEN_DURATION
+        low, high = END_SCREEN_DURATION_RANGE
+
+        def filename(value: Any) -> Optional[str]:
+            return value if isinstance(value, str) and value else None
+
+        return cls(
+            enabled=data.get("enabled") is True,
+            image=filename(data.get("image")),
+            music=filename(data.get("music")),
+            duration=max(low, min(float(duration), high)),
+        )
+
+
 # How a widescreen source fills a taller frame: one window cropped around the
 # subject, the whole frame in the middle with darkened copies of it stacked
 # above and below, or the source cut into a left and a right part stacked one
@@ -866,6 +908,9 @@ class ProjectSettings:
     # scheduled — when that differs from the application's answer. Empty means
     # "follow Settings", the way the Postiz block does.
     upload: UploadSettings = field(default_factory=UploadSettings)
+    # A picture held at the end of every clip, with optional music. Off until
+    # the user turns it on.
+    end_screen: EndScreenSettings = field(default_factory=EndScreenSettings)
     # Crop by default, which is what every project rendered before stacking
     # existed. Stacking only changes a render whose frame is taller than the
     # source; anything else is cropped whatever this says.
@@ -902,6 +947,7 @@ class ProjectSettings:
             highlights=HighlightSettings.from_dict(data.get("highlights")),
             postiz=PostizSettings.from_dict(data.get("postiz")),
             upload=UploadSettings.from_dict(data.get("upload")),
+            end_screen=EndScreenSettings.from_dict(data.get("end_screen")),
             layout=data.get("layout") if data.get("layout") in LAYOUT_CHOICES else "crop",
             stack_darkness=as_stack_darkness(data.get("stack_darkness")),
             split_position=as_split_position(data.get("split_position")),

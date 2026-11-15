@@ -14,6 +14,7 @@ from backend.src.dataclasses.data import (
     LAYOUT_CHOICES,
     CaptionSettings,
     DescriptionSettings,
+    EndScreenSettings,
     HighlightSettings,
     OverlayText,
     as_split_position,
@@ -36,6 +37,7 @@ from backend.src.infrastructure.youtube_auth import (
     remove_channel,
 )
 from backend.src.services.captions import CaptionService
+from backend.src.services.clipper import END_SCREEN_DIRECTORY
 from backend.src.services.uploader import (
     DEFAULT_PRIVACY,
     UploadInProgressError,
@@ -190,6 +192,13 @@ def parse_byte_range(header: Optional[str], size: int) -> Optional[Tuple[int, in
         return None
 
     return start, min(end, size - 1)
+
+
+# What the end screen accepts, by the kind of file.
+END_SCREEN_EXTENSIONS = {
+    'image': ('.png', '.jpg', '.jpeg', '.webp'),
+    'music': ('.mp3', '.m4a', '.aac', '.wav', '.ogg'),
+}
 
 
 class SimpleHandler(BaseHTTPRequestHandler):
@@ -396,6 +405,12 @@ class SimpleHandler(BaseHTTPRequestHandler):
                     '.jpg': 'image/jpeg',
                     '.jpeg': 'image/jpeg',
                     '.png': 'image/png',
+                    '.webp': 'image/webp',
+                    '.mp3': 'audio/mpeg',
+                    '.m4a': 'audio/mp4',
+                    '.aac': 'audio/aac',
+                    '.wav': 'audio/wav',
+                    '.ogg': 'audio/ogg',
                 }.get(file_path.suffix.lower(), 'application/octet-stream')
                 size = file_path.stat().st_size
                 # Seeking in a <video> is a byte-range request. Without a 206 the
@@ -1106,6 +1121,14 @@ class SimpleHandler(BaseHTTPRequestHandler):
                     **project.settings.upload.to_dict(),
                     **(data['upload'] or {}),
                 })
+            if 'end_screen' in data:
+                # Merged like the other blocks. The picture and the music are
+                # set by uploading them, not by naming a file here.
+                patch = {k: v for k, v in (data['end_screen'] or {}).items() if k not in ('image', 'music')}
+                project.settings.end_screen = EndScreenSettings.from_dict({
+                    **project.settings.end_screen.to_dict(),
+                    **patch,
+                })
             if 'captions' in data:
                 # Merged rather than replaced: the styler sends one changed
                 # field at a time as the user drags a slider.
@@ -1167,6 +1190,53 @@ class SimpleHandler(BaseHTTPRequestHandler):
             logger.exception("Failed to update clip captions")
             self.send_cors_error(500, f"Failed to update clip captions: {str(e)}")
 
+    def handle_end_screen_file(self, remove: bool):
+        """Stores or removes the project's end screen picture or music.
+
+        `POST /project/{id}/end_screen/{image|music}?name=<original filename>`
+        with the file as the body; `DELETE` on the same path removes it. The file
+        is kept as `<kind><ext>` in the project's end_screen directory, and the
+        setting is pointed at it.
+        """
+        url = urlparse(self.path)
+        parts = url.path.split('/')
+        project_id, kind = parts[2], parts[4] if len(parts) > 4 else ''
+        if kind not in END_SCREEN_EXTENSIONS:
+            self.send_cors_error(404, "Not an end screen file")
+            return
+        try:
+            project = Project(project_id)
+        except FileNotFoundError:
+            self.send_cors_error(404, f"Project {project_id} not found")
+            return
+
+        ext = Path((parse_qs(url.query).get('name') or [''])[0]).suffix.lower()
+        if not remove and ext not in END_SCREEN_EXTENSIONS[kind]:
+            allowed = ', '.join(END_SCREEN_EXTENSIONS[kind])
+            self.send_cors_error(400, f"The end screen {kind} must be one of: {allowed}")
+            return
+
+        directory = Path(project.base_directory) / project_id / END_SCREEN_DIRECTORY
+        previous = getattr(project.settings.end_screen, kind)
+        if previous:
+            (directory / previous).unlink(missing_ok=True)
+
+        filename = None
+        if not remove:
+            directory.mkdir(parents=True, exist_ok=True)
+            filename = f"{kind}{ext}"
+            with open(directory / filename, 'wb') as f:
+                remaining = int(self.headers.get('Content-Length', 0))
+                while remaining > 0:
+                    chunk = self.rfile.read(min(remaining, 65536))
+                    if not chunk: break
+                    f.write(chunk)
+                    remaining -= len(chunk)
+
+        setattr(project.settings.end_screen, kind, filename)
+        project.set_property("settings", project.settings)
+        self.send_json_response({"status": "success", "end_screen": project.settings.end_screen.to_dict()})
+
     def do_PUT(self):
         logger.info(f"PUT {self.path}")
         path = urlparse(self.path).path
@@ -1188,6 +1258,7 @@ class SimpleHandler(BaseHTTPRequestHandler):
         elif self.path == '/youtube/connect/cancel': self.handle_post_youtube_cancel()
         elif self.path.startswith('/project/upload/'): self.handle_post_upload()
         elif self.path == '/project/step': self.handle_post_step()
+        elif '/end_screen/' in self.path: self.handle_end_screen_file(remove=False)
         elif self.path.endswith('/upload'): self.handle_post_upload_clip()
         elif self.path.endswith('/postiz'): self.handle_post_postiz_clip()
         elif self.path.endswith('/regenerate'): self.handle_post_regenerate_clip()
@@ -1218,6 +1289,8 @@ class SimpleHandler(BaseHTTPRequestHandler):
         logger.info(f"DELETE {self.path}")
         if self.path.startswith('/youtube/channels/'):
             self.handle_delete_youtube_channel()
+        elif self.path.startswith('/project/') and '/end_screen/' in self.path:
+            self.handle_end_screen_file(remove=True)
         elif self.path.startswith('/project/') and '/clip/' in self.path:
             parts = self.path.split('/')
             project_id = parts[2]

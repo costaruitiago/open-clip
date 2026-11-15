@@ -6,10 +6,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple
 from backend.src.dataclasses.data import Highlight, Project, Clip
-from backend.src.infrastructure.video_engine import OpenCVVideoEngine
+from backend.src.infrastructure.video_engine import OpenCVVideoEngine, append_end_screen
 from backend.src.services.captions import CaptionService
 
 logger = logging.getLogger(__name__)
+
+# Where a project keeps its end screen picture and music, inside its directory.
+END_SCREEN_DIRECTORY = "end_screen"
 
 class Clipper:
     def __init__(self, caption_service: CaptionService = None):
@@ -58,6 +61,24 @@ class Clipper:
             or self.captions.overlay(project, highlight) is not None
         )
 
+    def _append_end_screen(self, project: Project, project_dir: str, clip_path: str) -> None:
+        """Holds the project's end screen picture at the end of the clip, if it has one."""
+        end_screen = project.settings.end_screen
+        if not end_screen.enabled or not end_screen.image:
+            return
+        directory = Path(project_dir) / END_SCREEN_DIRECTORY
+        image = directory / end_screen.image
+        if not image.exists():
+            raise FileNotFoundError(
+                "The end screen picture for this project is missing. Upload it again in Project settings."
+            )
+        music = directory / end_screen.music if end_screen.music else None
+        if music is not None and not music.exists():
+            raise FileNotFoundError(
+                "The end screen music for this project is missing. Upload it again in Project settings."
+            )
+        append_end_screen(clip_path, str(image), end_screen.duration, str(music) if music else None)
+
     def _render_highlight(self, project: Project, engine, input_path: str, clips_dir: str,
                           index: int, highlight: Highlight,
                           dimensions: Optional[Tuple[int, int]]) -> str:
@@ -88,6 +109,7 @@ class Clipper:
             split_swap=project.settings.split_swap,
             split_divider=project.settings.split_divider,
         )
+        self._append_end_screen(project, os.path.dirname(input_path), output_path)
 
         highlight.is_clip_generated = True
         highlight.generated_clip_filename = filename
