@@ -1,5 +1,4 @@
 import React from 'react';
-import { Button } from './Button';
 
 interface NavButtonProps {
   onClick: () => void;
@@ -7,7 +6,7 @@ interface NavButtonProps {
 }
 
 export const NavButton: React.FC<NavButtonProps> = ({ onClick, children }) => (
-  <Button variant="ghost" onClick={onClick} style={{ marginRight: 'var(--space-sm)' }}>
+  <button type="button" className="nav-action" onClick={onClick}>
     {children}
-  </Button>
+  </button>
 );

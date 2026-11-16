@@ -51,15 +51,14 @@ export const Tooltip: React.FC<TooltipProps> = ({ text, children }) => {
             padding: '4px 8px',
             background: 'var(--text)',
             color: 'var(--bg)',
-            fontSize: '0.7rem',
-            fontWeight: 900,
-            textTransform: 'uppercase',
+            fontSize: '0.75rem',
+            fontWeight: 500,
             // Long labels used to force the row wider instead of wrapping.
             maxWidth: 'min(16rem, 60vw)',
             width: 'max-content',
             zIndex: 1000,
             pointerEvents: 'none',
-            boxShadow: '2px 2px 0px var(--border-color)',
+            boxShadow: 'var(--shadow-float)',
           }}
         >
           {text}

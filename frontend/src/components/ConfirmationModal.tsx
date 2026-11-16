@@ -19,8 +19,8 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   message,
   onConfirm,
   onCancel,
-  confirmText = 'CONFIRM',
-  cancelText = 'CANCEL',
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
   alternative,
 }) => {
   const titleId = useId();
@@ -102,11 +102,11 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         style={{
           backgroundColor: 'var(--bg)',
           color: 'var(--text)',
-          border: 'var(--border)',
+          border: 'var(--border)', borderRadius: 'var(--radius-lg)',
           padding: 'var(--space-xl)',
           maxWidth: '500px',
           width: '90%',
-          boxShadow: '8px 8px 0px var(--accent)',
+          boxShadow: 'var(--shadow-float)',
           animation: 'entrance 300ms var(--ease-out-quart)'
         }}
       >
@@ -114,8 +114,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           id={titleId}
           style={{
             fontSize: '2rem',
-            fontWeight: '900',
-            textTransform: 'uppercase',
+            fontWeight: 500,
             marginBottom: 'var(--space-md)',
             lineHeight: '1'
           }}
@@ -124,7 +123,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         </h2>
         <p style={{ 
           fontSize: '1.1rem', 
-          fontWeight: 'bold', 
+          fontWeight: 500, 
           marginBottom: 'var(--space-xl)',
           lineHeight: '1.4'
         }}>

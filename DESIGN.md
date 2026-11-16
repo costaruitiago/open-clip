@@ -1,89 +1,101 @@
-# Design System: Impeccable Brutalist
+# Design System: Edit Bay
 
-This document codifies the design language and implementation patterns for the studio interface. It is a living document intended to guide all future UI developments to maintain the defined bold, brutalist aesthetic.
+This document codifies the design language and implementation patterns for the studio interface. It is a living document intended to guide all future UI work.
 
 **Source of truth**: `frontend/src/index.css`. The values below mirror what ships. When the two disagree, the stylesheet wins and this document is the thing that needs fixing.
 
-## Philosophy: Utility-First Brutalism
+## Philosophy: Quiet Chrome, Loud Footage
 
-The interface is a high-performance tool for content creators.
+The interface is a tool for creators turning long recordings into short clips. Its character is exact, unhurried and editorial: a night edit bay rather than a dashboard.
 
-- **Bold Visual Hierarchy**: Use scale and high-contrast weight to establish priority.
-- **Raw Utility**: No decorative fluff. Every element serves a functional purpose.
-- **Intentional Brutalism**: Harsh lines (4px borders), high-contrast palettes, and raw geometric forms prioritize speed and clarity.
+- **The clips carry the colour.** Every page is mostly footage. The chrome around it (navigation, buttons, panels) stays graphite and hairline so the frames read first.
+- **One accent, used rarely.** The brand ember marks what is happening now, or the exception. Nothing else is orange.
+- **Hierarchy from size and colour, not weight.** Weights are 400 and 500, with 600 only for the wordmark. Sentence case everywhere.
+- **The readout is the signature.** Timecodes, Jev scores, counts and file names are set in the system monospace with tabular figures, like the readouts on an edit bay.
 
-Brutalism here is a visual stance, not an excuse for an inaccessible interface. Where the two appear to conflict, contrast wins — see [Accessibility Floor](#accessibility-floor).
+Quiet is not an excuse for an inaccessible interface. Where the two conflict, contrast wins. See [Accessibility Floor](#accessibility-floor).
 
 ## Foundation
 
 ### Colors
 
-Neutrals are tinted rather than pure. `#000000` and `#FFFFFF` are deliberately not used as page background or body text; they read as harsher than the brutalist forms need and cause halation against 4px borders.
-
-Every colour that carries text is chosen to clear 4.5:1 against the surface it sits on, in **both** themes. Three tokens fork per theme because a single value cannot do that.
+A graphite ramp with no tint, because any hue in the surfaces would fight the footage. Every colour that carries text is chosen to clear 4.5:1 against the surface it sits on, in **both** themes.
 
 | Token | Light | Dark | Notes |
 |---|---|---|---|
-| `--bg` | `#F9F9F9` | `#121212` | Page surface |
-| `--bg-secondary` | `#EDEDED` | `#1E1E1E` | Recessed panels |
-| `--text` | `#121212` | `#F9F9F9` | Body |
-| `--text-muted` | `#6B6B6B` | `#A0A0A0` | 5.06:1 / 7.16:1 on `--bg` |
-| `--text-disabled` | `#6E6E6E` | `#858585` | 4.84:1 / 5.13:1. Dead text — see below |
-| `--accent` | `#C42F00` | `#FF7A52` | 5.31:1 / 7.28:1. Active execution states |
-| `--success` | `#00FF41` | `#00CC33` | Fill only — pair with `--on-success` |
-| `--on-success` | `#121212` | `#121212` | Does not track `--bg`; green needs dark text in both themes |
-| `--error` | `#D40000` | `#FF4D4D` | 5.25:1 / 5.73:1 |
-| `--border-color` | `var(--text)` | `#FFFFFF` | |
+| `--bg` | `#FAFAFA` | `#141415` | Page surface |
+| `--bg-raised` | `#FFFFFF` | `#19191B` | Cards, menus, controls |
+| `--bg-secondary` | `#F4F4F5` | `#232325` | Selected rows, hover, recessed panels |
+| `--text` | `#171717` | `#EDEDED` | Primary text |
+| `--text-secondary` | `#525252` | `#A1A1A6` | Secondary text, nav items |
+| `--text-muted` | `#737373` | `#85858B` | Meta and captions only |
+| `--text-disabled` | `#737373` | `#85858B` | Dead text, see below |
+| `--hairline` | text at 10% | text at 8% | `--border-color`, every border |
+| `--hairline-strong` | text at 18% | text at 16% | Inputs, hovered cards, dashed drop zones |
+| `--accent` | `#C42F00` | `#FF7A52` | 5.3:1 / 7.3:1. Pairs with `--on-accent` |
+| `--success` | `#16A34A` | `#4CC38A` | Pairs with `--on-success` |
+| `--error` | `#DC2626` | `#E5484D` | |
+| `--warning` | `#D97706` | `#E09A00` | Partly done. Text form is `--warning-text` |
 
-**On the accent.** The brand orange is `#C42F00`, darkened from the `#FF3E00` this document specified for years. `#FF3E00` is 3.36:1 on `--bg` and was never usable for text or as a fill behind `--bg` text — it failed WCAG AA everywhere it was applied. The dark-theme value lifts to `#FF7A52` for the same reason in reverse.
+**On the accent.** The brand orange is `#C42F00`, darkened from the `#FF3E00` this document specified for years, which was 3.36:1 on the page and failed AA everywhere it was applied. The dark theme lifts it to `#FF7A52` for the same reason in reverse.
 
-**On disabled text.** `--text-disabled` exists because `opacity` did the job before it, and `opacity: 0.5` over `--text-muted` lands at 2.0:1. A disabled *control* is exempt from 1.4.3; its label is not exempt from being read, and the label is where the reason for the disabling lives. So dead text keeps a checked contrast and says it is dead some other way: no underline, `cursor: not-allowed`, and a label that names the precondition. The `opacity: 0.55` in `button:disabled` stays — that one fades a filled button, where the fill carries the state.
+**On disabled text.** Fading text with `opacity` is how a checked colour silently stops passing. Dead text keeps a checked contrast and says it is dead some other way: no underline, `cursor: not-allowed`, and a label that names the precondition. The `opacity: 0.5` in `button:disabled` fades a whole control, which is a different job.
 
 **What each colour means.** The palette is small enough that each colour has to mean one thing, everywhere:
 
-- `--accent` — **happening now, or the exception.** A running pipeline step, a clip being cut, a clip whose captions or overlay title are unlocked from the project's, a highlight's hook and social copy (the model talking, as against the transcript quote beside it, which is the one thing on that panel that was actually said).
-- `--success` — **finished, and not undoable from here.** Captions or a title already burned into a file's pixels. Always a fill with `--on-success`; see below. Publication is deliberately *not* in this list: the application cannot see a video deleted on YouTube afterwards, so any badge claiming a clip is published goes stale silently. The card says nothing about YouTube.
-- `--error` — **failed, or about to destroy something.** A failed step, a failed save, delete.
+- `--accent`: **happening now, or the exception.** A running pipeline step, a clip being cut, a clip whose captions or overlay title are unlocked from the project's, the publish action on a clip card, a highlight's hook and social copy.
+- `--success`: **finished, and not undoable from here.** A done pipeline step's dot, captions burned into a file, a clip Postiz has published. Publication to YouTube is deliberately *not* in this list: the application cannot see a video deleted on YouTube afterwards, so any badge claiming a clip is published goes stale silently.
+- `--error`: **failed, or about to destroy something.** A failed step, a failed save, delete.
 
-A state that is none of these is not coloured. Neutral is the default and stays the majority of the page — a preview clip that has simply not been cut yet gets a black chip, not a colour, because nothing has happened to it.
+A state that is none of these is not coloured. Neutral is the default and stays the majority of the page.
 
-**Foreground pairing.** `--accent` and `--error` are both used as fills behind `var(--bg)` text; that pairing is contrast-checked and correct. `--success` is the exception — it takes `--on-success`, because a dark foreground is required on green in both themes. Do not use `var(--bg)` on a success fill.
+**Tints, not fills.** A state rarely fills a whole control. A running or failed pipeline step takes an 8% `color-mix` tint of its colour with the colour as text, and done or partial steps keep the neutral surface with a status dot. Solid fills are reserved for the primary button.
 
-**Accent and error are adjacent hues.** Orange-red `#C42F00` and red `#D40000` sit next to each other in the pipeline step row (running vs. failed). Because of that, **status must never be conveyed by fill colour alone** — every status surface also carries a text label. See `statusLabel()` in `PipelineController.tsx`.
+**Accent and error are adjacent hues.** Because of that, **status must never be conveyed by colour alone**. Every status surface also carries a text label. See `statusLabel()` in `PipelineController.tsx`.
 
 ### Typography
 
-- **Primary Font**: Helvetica Neue / Arial (system sans-serif)
-- **Scales** (as implemented, fluid via `clamp()`):
-  - `h1`: `clamp(3rem, 10vw, 6rem)`, 900 weight, `-0.04em` tracking, uppercase
-  - `h2`: `clamp(2rem, 5vw, 3rem)`, 900 weight, `-0.02em` tracking, uppercase
-  - `.wordmark`: `clamp(1.25rem, 2.5vw, 1.75rem)` — looks like a title but is not one; it repeats on every route and must not compete with the page `h1`, which an earlier `clamp(2rem, 5vw, 4rem)` did above 960px
-  - Body: `1rem`
-  - Labels: `0.65rem`–`0.9rem`, 900 weight, uppercase, `0.05em` tracking
-
-Pages may set a smaller `h1` inline where the page heading shares a row with controls.
+- **Interface**: the system UI font (`system-ui`). No web fonts and no external requests
+- **Readouts**: the system monospace (`ui-monospace`) with `tabular-nums`, through the `.mono` class or `--font-mono`, for timecodes, scores, counts, dates in meta lines and file names
+- **Scale**:
+  - Body: `14px`, line height 1.45
+  - Secondary and meta: `12px` to `13px`
+  - `h1`: `clamp(1.75rem, 3vw, 2rem)`, 500 weight, `-0.01em` tracking
+  - `h2`: `1.25rem`, 500 weight
+  - `.wordmark`: `1rem`, 600 weight. It repeats on every route and must not compete with the page `h1`
+- **No uppercase labels, no wide tracking, no italic for emphasis.** Letter spacing is 0 under 16px.
+- **Nothing under 12px** in the interface. Captions and titles rendered over the picture are content, not interface, and follow their own styling.
 
 ### Spacing
 
-A compact rhythm. These are the shipped values:
+A 4px grid. These are the shipped values:
 
-- `--space-xs`: `0.125rem`
-- `--space-sm`: `0.25rem`
-- `--space-md`: `0.75rem`
-- `--space-lg`: `1rem`
-- `--space-xl`: `2rem`
+- `--space-xs`: `4px`
+- `--space-sm`: `8px`
+- `--space-md`: `12px`
+- `--space-lg`: `16px`
+- `--space-xl`: `32px`
 
-Do not hard-code `1rem` / `0.5rem` / `4px` in component styles. Every literal spacing value in a component is a token that failed to get used.
+Space inside a group is smaller than space between groups. Do not hard-code spacing in component styles; every literal is a token that failed to get used.
+
+### Radius
+
+| Token | Value | Use |
+|---|---|---|
+| `--radius-sm` | `6px` | Tags, keycaps, small buttons |
+| `--radius` | `8px` | Buttons, inputs, selects, nav items |
+| `--radius-lg` | `12px` | Cards, panels, alerts, menus |
+| `--radius-xl` | `16px` | The upload drop zone |
+
+Nested radius: inner = outer minus the padding between them, never below 4px. The clip card's media is `11px`: the card's 12px less its 1px border.
 
 ## Patterns
 
 ### Containers & Borders
 
-- **Borders**: use the `--border` token (`var(--border-width) solid var(--border-color)`), not a literal `4px solid var(--text)`. The literal diverges in dark theme, where `--border-color` is `#FFFFFF` but `--text` is `#F9F9F9`.
-- **Radius**: zero, everywhere. No `border-radius` on any control, including native `<select>`.
-- **Border weight**: `--border` (4px) is the system's rule. A 2px border is a real second tier — `.status-badge`, `.options-bar__select`, the LLM output table headers — for things that sit *inside* a 4px-bordered region and would otherwise read as a card in a card.
-- **Containers**: flat, edge-to-edge layouts. **No nested cards** — a bordered block inside a bordered block is the one composition this system rules out. Separate flat regions with a single rule (`borderTop: var(--border)`) instead.
-- **Shadows**: no soft or drop shadows, ever. Hard offset shadows (`4px 4px 0px var(--border-color)`) are permitted in three places only: hover states conveying interactivity, modal elevation above a scrim, and the title burned *over the picture* — the one shadow that also has to exist in the rendered file, where the offset does the job a border does elsewhere: separating text from a ground the palette does not control. No blur, no `backdrop-filter`, in any of the three.
+- **Borders**: use the `--border` token (`1px solid var(--hairline)`). Inputs and hovered cards take `--hairline-strong`.
+- **Containers**: a card is `--bg-raised`, a hairline and `--radius-lg`. Avoid a bordered block inside a bordered block; separate regions inside a card with a single hairline rule instead.
+- **Shadows**: only on things that float over the page, like menus and modals, through `--shadow-float`. Nothing at rest has a shadow, and nothing glows. On dark, depth comes from the surface steps.
 
 ### Layout
 
@@ -104,13 +116,17 @@ Every grid track minimum is wrapped in `min(Npx, 100%)`. This is what stops a fi
 
 Use the `Button` component (`components/Button.tsx`). Variants: `primary`, `ghost`, `danger`. Sizes: `sm`, `md`, `lg`.
 
-- **Base**: transparent background, `var(--border)`, `var(--text)`, uppercase, 900 weight.
-- **Hover**: invert to `--btn-hover-bg` / `--btn-hover-text`, plus `translate(2px, 2px)`.
-- **Active**: `translate(4px, 4px)`.
-- **Disabled**: `opacity: 0.55` and `not-allowed`, from the base `button:disabled` rule. Do not write it inline — components that did drifted to their own values, and the same `0.5` reads differently on a filled button than on a ghost one. Hover and active are suppressed for disabled buttons, so a dead control never promises a press it will not accept.
-- **Hierarchy matters.** Not every button is `primary`. Secondary and tertiary actions take `ghost`; destructive actions take `danger`.
-- **Selects** use `.options-bar__select`, which carries the whole geometry (44px target, 2px border, `--bg-secondary` fill, `0.8rem`). Do not re-type it inline — three copies of it is three places to edit for one change.
-- **Say why it is disabled.** A disabled button's label — or its tooltip, where the control is an icon — is where the reason lives: "This clip is being uploaded, which re-cuts it", not a bare greyed-out re-render arrow.
+- **Primary**: a `--text` fill with `--bg` text. One per view at most.
+- **Ghost**: `--bg-raised`, a hairline and `--text`. The default for secondary actions.
+- **Danger**: `--error` text on a transparent ground, with an `--error` tint on hover.
+- **Navigation and project actions** (`.nav-action`): borderless `--text-secondary` text that takes a `--bg-secondary` surface on hover or when its menu is open.
+- **Icon buttons on clip cards** are borderless and `--text-secondary`. Colour on one of them is a state, never decoration.
+- **Hover**: a surface step (`--btn-hover-bg`). Nothing moves on hover.
+- **Active**: `scale(0.98)`.
+- **Disabled**: `opacity: 0.5` and `not-allowed`, from the base `button:disabled` rule. Do not write it inline. Hover and active are suppressed for disabled buttons.
+- **Selects** use `.options-bar__select`, which carries the whole geometry. Do not re-type it inline.
+- **Say why it is disabled.** A disabled button's label, or its tooltip where the control is an icon, is where the reason lives.
+- **Icons** are inline line SVGs at 16px with a 1.5 stroke in `currentColor`. No emoji or text glyphs (`✕`, `▼`, `📅`) as icons.
 
 ### Links
 
@@ -118,35 +134,30 @@ There is one rule for `a`, in `index.css`: `--text-accent`, underlined. The appl
 
 ### Status Indicators
 
-Use the `.status-badge` class. It fixes the geometry (2px border, `0.65rem`, 900 weight, uppercase, `0.05em` tracking) so every state pill in the app reads as the same object. Colour is passed in by the caller, since what a state *means* is the caller's business:
+Use the `.status-badge` class. It fixes the geometry (1px `--hairline-strong` border, 4px corners, 12px, 500 weight) so every state reads as the same object. Pipeline steps carry a 6px status dot ahead of their name, coloured through the `--step-dot` custom property: green done, amber partly done, a hairline ring still to do, and the accent for running.
 
-```jsx
-<span className="status-badge" style={{ background: 'var(--success)', color: 'var(--on-success)' }}>
-  Rendered
-</span>
-```
-
-Accent for active execution states (transcribing, rendering, uploading). Always pair the colour with a text label.
+Always pair the colour with a text label.
 
 ### Motion
 
-- **Easing**: `--ease-out-quart` (`cubic-bezier(0.25, 1, 0.5, 1)`). Real objects decelerate; nothing overshoots.
-- **Duration**: 200ms for state transitions, 300–400ms for entrances.
-- **No bounce or elastic easing.** It reads as dated. `nudge` replaced an earlier three-stage `bounce` for exactly this reason.
-- **Animate `transform` and `opacity` only.** Never `width`, `height`, `top`, or `left`.
-- **`prefers-reduced-motion: reduce` is honoured globally** in `index.css`. Indefinite animations (`sheen` during a pipeline step, `pulse` during generation) are the ones that matter most to suppress.
+- **Easing**: one curve, `--ease-out-quart`, now `cubic-bezier(0.22, 1, 0.36, 1)`. Nothing overshoots.
+- **Duration**: 150ms for hover, press and colour changes, 180ms for menus, 300ms for entrances.
+- **Entrances**: one short fade and 8px rise. Staggers are 50ms and stop after six items.
+- **Nothing loops unless it is live.** The running step's dot breathes and a spinner turns while work runs; nothing else repeats. The pipeline finishing is said once, by a flat green wash that fades.
+- **Transition named properties only**, never `all`. Animate `transform` and `opacity`, never `width`, `height`, `top` or `left`.
+- **`prefers-reduced-motion: reduce` is honoured globally** in `index.css`.
 
 ### Accessibility Floor
 
 Non-negotiable, and checked at review:
 
 - **Contrast**: 4.5:1 for text, 3:1 for non-text and focus indicators, in both themes.
-- **Touch targets**: 44×44px minimum for anything interactive.
-- **Focus**: `:focus-visible` is a 4px `--accent` outline at 3px offset, defined globally. Do not remove it or override it per-component.
+- **Touch targets**: 44×44px minimum on coarse pointers. With a mouse, compact controls may be 36px; the `(pointer: coarse)` rules in `index.css` restore 44px.
+- **Focus**: `:focus-visible` is a 2px `--accent` outline at 2px offset, defined globally. Do not remove it or override it per-component.
 - **Status is never colour-only**: pair every colour-coded state with text.
 - **Every working region is named**: a bare `<section>` is neither a landmark nor a heading. Give it an `aria-labelledby` pointing at a real heading — `.visually-hidden` where the design does not want a visible one — or a screen reader's heading and landmark lists are both empty.
 - **Disabled means a disabled control**: `aria-disabled` on a `<span>` does nothing. A span has no role for the state to attach to, and it is not in the tab order.
-- **Opacity is not a styling tool on text.** Fading a label over a coloured fill is how a contrast-checked colour silently stops passing.
+- **Opacity is not a styling tool on text.** Fading a label is how a contrast-checked colour silently stops passing.
 
 ## Enforcement
 

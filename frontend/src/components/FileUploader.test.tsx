@@ -13,11 +13,11 @@ describe('FileUploader Component', () => {
       />
     );
     
-    expect(screen.getByText(/Upload Video/i)).toBeDefined();
-    expect(screen.getByText(/Drag and drop your video file here/i)).toBeDefined();
+    expect(screen.getByText(/Drop a recording to cut it into clips/i)).toBeDefined();
+    expect(screen.getByText(/finds the highlights/i)).toBeDefined();
   });
 
-  it('renders the "DROP VIDEO HERE" indicator', () => {
+  it('renders the "Choose a video" action', () => {
     render(
       <FileUploader 
         onFileSelect={vi.fn()} 
@@ -27,6 +27,6 @@ describe('FileUploader Component', () => {
       />
     );
     
-    expect(screen.getByText(/DROP VIDEO HERE/i)).toBeDefined();
+    expect(screen.getByText(/Choose a video/i)).toBeDefined();
   });
 });

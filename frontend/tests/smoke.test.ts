@@ -7,7 +7,7 @@ test.describe('Core Application Smoke Test', () => {
 
     // Verify critical elements are visible
     await expect(page.getByText('Open Clip')).toBeVisible();
-    await expect(page.getByText('Upload Video')).toBeVisible();
+    await expect(page.getByText('Drop a recording to cut it into clips')).toBeVisible();
   });
 
   test('should navigate to history page', async ({ page }) => {

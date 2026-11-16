@@ -155,17 +155,15 @@ export const PostizPanel: React.FC<PostizPanelProps> = ({ projectId, settings, v
   );
 
   const labelStyle: React.CSSProperties = {
-    fontWeight: 900,
-    fontSize: '0.65rem',
-    letterSpacing: '0.05em',
-    textTransform: 'uppercase',
+    fontWeight: 500,
+    fontSize: '0.75rem',
   };
 
   const fieldStyle: React.CSSProperties = {
     padding: 'var(--space-sm)',
     background: 'var(--bg)',
     color: 'var(--text)',
-    border: 'var(--border)',
+    border: 'var(--border)', borderRadius: 'var(--radius-lg)',
     fontFamily: 'inherit',
     fontSize: '0.85rem',
     width: '100%',
@@ -206,7 +204,7 @@ export const PostizPanel: React.FC<PostizPanelProps> = ({ projectId, settings, v
           {(postiz?.channels?.length ?? 0) > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
               <span style={labelStyle}>Channels</span>
-              <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                 {follows
                   ? 'Following Settings: change the default there and this project follows it. Tick anything here and this project stops following and keeps its own list.'
                   : 'This project has its own list. Nothing ticked means it imports nowhere.'}
@@ -274,7 +272,7 @@ export const PostizPanel: React.FC<PostizPanelProps> = ({ projectId, settings, v
               max={latestScheduleDate()}
               style={fieldStyle}
             />
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
               Empty follows Settings, and Settings with no date starts as soon as a post may be
               placed. Today at the earliest, and at most {MAX_SCHEDULE_YEARS_AHEAD} years out.
             </span>
@@ -298,7 +296,7 @@ export const PostizPanel: React.FC<PostizPanelProps> = ({ projectId, settings, v
                 <option key={choice.value} value={choice.value}>{choice.label}</option>
               ))}
             </select>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
               A clip keeps its slot however it was imported, so re-importing one moves nothing.
             </span>
           </div>
@@ -331,7 +329,7 @@ export const PostizPanel: React.FC<PostizPanelProps> = ({ projectId, settings, v
                 ))}
               </select>
             </div>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
               On this machine's clock. One post a day goes out at the first hour; the rest of a
               day's posts are spaced evenly up to the last.
             </span>
@@ -365,7 +363,7 @@ export const PostizPanel: React.FC<PostizPanelProps> = ({ projectId, settings, v
               placeholder="Empty: use the one from Settings"
               style={{ ...fieldStyle, minHeight: '70px', fontFamily: 'monospace', lineHeight: 1.4 }}
             />
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
               Posted as a thread or first comment where the platform has one. Left out when it
               renders empty, so a project with no source URL gets no dangling "Full episode:".
             </span>

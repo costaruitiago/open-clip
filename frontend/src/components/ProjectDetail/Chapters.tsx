@@ -101,7 +101,7 @@ export const ChaptersPanel: React.FC<ChaptersPanelProps> = ({ projectId, output 
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
       <div style={{ display: 'flex', gap: 'var(--space-sm)', flexWrap: 'wrap', alignItems: 'center' }}>
         <Button variant="ghost" onClick={copy} style={{ fontSize: '0.75rem', padding: '0.5rem 1rem', minHeight: '44px' }}>
-          {copyState === 'copied' ? 'Copied ✓' : 'Copy for YouTube'}
+          {copyState === 'copied' ? 'Copied' : 'Copy for YouTube'}
         </Button>
         <Button
           variant="ghost"
@@ -117,19 +117,19 @@ export const ChaptersPanel: React.FC<ChaptersPanelProps> = ({ projectId, output 
         >
           Export Chapter Markers
         </Button>
-        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
           {chapters.length === 1 ? '1 chapter' : `${chapters.length} chapters`}
         </span>
       </div>
 
       {copyState === 'failed' && (
-        <p role="alert" style={{ margin: 0, fontSize: '0.7rem', color: 'var(--error)' }}>
+        <p role="alert" style={{ margin: 0, fontSize: '0.75rem', color: 'var(--error)' }}>
           Copy failed — this browser blocked clipboard access. Select the text below and copy it, or download the .txt.
         </p>
       )}
 
       {warnings.map((warning) => (
-        <p key={warning} role="alert" style={{ margin: 0, fontSize: '0.7rem', color: 'var(--error)' }}>
+        <p key={warning} role="alert" style={{ margin: 0, fontSize: '0.75rem', color: 'var(--error)' }}>
           {warning}
         </p>
       ))}
@@ -139,7 +139,7 @@ export const ChaptersPanel: React.FC<ChaptersPanelProps> = ({ projectId, output 
         style={{
           margin: 0,
           padding: 'var(--space-sm)',
-          border: '2px solid var(--border-color)',
+          border: 'var(--border)', borderRadius: 'var(--radius-lg)',
           background: 'var(--bg-secondary)',
           fontSize: '0.8rem',
           lineHeight: 1.6,

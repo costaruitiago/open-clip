@@ -317,7 +317,7 @@ export const ClipPlayer: React.FC<ClipPlayerProps> = ({
             alignItems: 'center',
             gap: 'var(--space-sm)',
             padding: 'var(--space-sm)',
-            borderTop: '2px solid var(--border-color)',
+            borderTop: 'var(--border)',
             backgroundColor: 'var(--bg)',
           }}
         >
@@ -331,7 +331,7 @@ export const ClipPlayer: React.FC<ClipPlayerProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              border: 'var(--border)',
+              border: 'var(--border)', borderRadius: 'var(--radius)',
               background: 'var(--bg)',
               color: 'var(--text)',
               cursor: 'pointer',
@@ -360,8 +360,8 @@ export const ClipPlayer: React.FC<ClipPlayerProps> = ({
               editor, so it is shown alongside the position within the window. */}
           <span
             style={{
-              fontSize: '0.7rem',
-              fontWeight: 700,
+              fontSize: '0.75rem',
+              fontWeight: 500,
               color: 'var(--text-muted)',
               whiteSpace: 'nowrap',
               fontVariantNumeric: 'tabular-nums',

@@ -201,7 +201,7 @@ export const ClipTrimmer: React.FC<ClipTrimmerProps> = ({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
       <label
         htmlFor={`clip-${clipIndex}-trim-${kind}`}
-        style={{ fontSize: '0.75rem', fontWeight: 900, textTransform: 'uppercase' }}
+        style={{ fontSize: '0.75rem', fontWeight: 500}}
       >
         {kind === 'start' ? 'Starts at' : 'Ends at'}{' '}
         <span style={{ color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
@@ -238,10 +238,10 @@ export const ClipTrimmer: React.FC<ClipTrimmerProps> = ({
             width: '7ch',
             minHeight: '44px',
             padding: 'var(--space-sm)',
-            border: 'var(--border)',
+            border: 'var(--border)', borderRadius: 'var(--radius)',
             background: 'var(--bg)',
             color: 'var(--text)',
-            fontWeight: 900,
+            fontWeight: 500,
             fontVariantNumeric: 'tabular-nums',
           }}
         />
@@ -335,7 +335,7 @@ export const ClipTrimmer: React.FC<ClipTrimmerProps> = ({
                 <span
                   style={{
                     fontSize: '0.75rem',
-                    fontWeight: 900,
+                    fontWeight: 500,
                     fontVariantNumeric: 'tabular-nums',
                     whiteSpace: 'nowrap',
                   }}
@@ -389,7 +389,7 @@ export const ClipTrimmer: React.FC<ClipTrimmerProps> = ({
               style={{
                 margin: 0,
                 padding: 'var(--space-md)',
-                border: 'var(--border-width) dashed var(--border-color)',
+                border: '1px dashed var(--hairline-strong)', borderRadius: 'var(--radius-lg)',
                 textAlign: 'center',
                 fontSize: '0.75rem',
               }}
@@ -416,7 +416,7 @@ export const ClipTrimmer: React.FC<ClipTrimmerProps> = ({
             style={{
               margin: 0,
               fontSize: '0.8rem',
-              fontWeight: 900,
+              fontWeight: 500,
               fontVariantNumeric: 'tabular-nums',
             }}
           >

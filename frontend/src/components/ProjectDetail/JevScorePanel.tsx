@@ -43,7 +43,7 @@ export const JevScorePanel: React.FC<JevScorePanelProps> = ({ projectId, cutoff,
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)', minWidth: '260px' }}>
-      <label htmlFor={sliderId} style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase' }}>
+      <label htmlFor={sliderId} style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 500, fontSize: '0.8rem'}}>
         <span>Minimum score</span>
         <span style={{ fontVariantNumeric: 'tabular-nums' }}>{draft}</span>
       </label>

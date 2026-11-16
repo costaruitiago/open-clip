@@ -97,19 +97,17 @@ const COLORS: Array<{ key: keyof OverlayText; label: string }> = [
 ];
 
 const labelStyle: React.CSSProperties = {
-  fontWeight: 900,
-  textTransform: 'uppercase',
-  fontSize: '0.7rem',
-  letterSpacing: '0.05em',
+  fontWeight: 500,
+  fontSize: '0.75rem',
 };
 
 const controlStyle: React.CSSProperties = {
   width: '100%',
   padding: '0.4rem',
-  border: '2px solid var(--border-color)',
+  border: 'var(--border)', borderRadius: 'var(--radius)',
   background: 'var(--bg)',
   color: 'var(--text)',
-  fontWeight: 700,
+  fontWeight: 500,
   fontSize: '0.8rem',
   minHeight: '44px',
 };
@@ -164,7 +162,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
             onChange={(event) => set('text', event.target.value)}
             style={{ ...controlStyle, resize: 'vertical', fontFamily: 'inherit' }}
           />
-          <p style={{ margin: 'var(--space-sm) 0 0 0', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+          <p style={{ margin: 'var(--space-sm) 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
             A line break here is a line break on the video. Wrap a word in
             {' '}<code>*asterisks*</code>{' '}to colour it — one word, so the eye has somewhere to land.
           </p>
@@ -172,8 +170,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
             <p
               style={{
                 margin: 'var(--space-sm) 0 0 0',
-                fontSize: '0.7rem',
-                fontWeight: 700,
+                fontSize: '0.75rem',
+                fontWeight: 500,
                 color: overlong ? 'var(--accent)' : 'var(--text-muted)',
               }}
             >
@@ -211,7 +209,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
             </Button>
           ))}
         </div>
-        <p style={{ margin: 'var(--space-sm) 0 0 0', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+        <p style={{ margin: 'var(--space-sm) 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
           Sets the colours, the outline and the shadow together. Yellow on black is the
           pairing that measures highest; black on white is the one for dark footage.
         </p>
@@ -248,7 +246,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
       })}
 
       {clipped && (
-        <p style={{ margin: 0, fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent)' }}>
+        <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: 500, color: 'var(--accent)' }}>
           A word is wider than the frame at this size, and the burn cuts it off rather than
           breaking it. Make it smaller, widen it, or put a line break in the text.
         </p>

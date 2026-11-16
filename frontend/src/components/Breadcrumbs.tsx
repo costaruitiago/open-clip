@@ -12,15 +12,15 @@ interface BreadcrumbsProps {
 
 export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items }) => {
   return (
-    <nav aria-label="Breadcrumb" style={{ marginBottom: 'var(--space-md)', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-      <ol style={{ listStyle: 'none', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-xs)', padding: 0, margin: 0 }}>
+    <nav aria-label="Breadcrumb" style={{ margin: 'var(--space-md) 0', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+      <ol style={{ listStyle: 'none', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-sm)', padding: 0, margin: 0 }}>
         {items.map((item, index) => {
           const isCurrent = index === items.length - 1;
           return (
             <li key={index} style={{ display: 'flex', alignItems: 'center' }}>
-              {index > 0 && <span aria-hidden="true" style={{ marginRight: 'var(--space-xs)' }}>/</span>}
+              {index > 0 && <span aria-hidden="true" style={{ marginRight: 'var(--space-sm)', color: 'var(--hairline-strong)' }}>/</span>}
               {isCurrent || !item.onClick ? (
-                <span aria-current="page" style={{ color: 'var(--text-accent)', fontWeight: 700 }}>
+                <span aria-current="page" style={{ color: 'var(--text)', fontWeight: 500 }}>
                   {item.label}
                 </span>
               ) : (
@@ -34,7 +34,7 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items }) => {
                     font: 'inherit',
                     textTransform: 'none',
                     color: 'inherit',
-                    textDecoration: 'underline',
+                    textDecoration: 'none',
                   }}
                 >
                   {item.label}

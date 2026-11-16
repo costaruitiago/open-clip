@@ -12,7 +12,7 @@ interface WritingPanelProps {
 
 const cardStyle: React.CSSProperties = {
   padding: 'var(--space-md)',
-  border: 'var(--border)',
+  border: 'var(--border)', borderRadius: 'var(--radius-lg)',
   background: 'var(--bg)',
   display: 'flex',
   flexDirection: 'column',
@@ -23,10 +23,8 @@ const cardStyle: React.CSSProperties = {
 };
 
 const labelStyle: React.CSSProperties = {
-  fontSize: '0.65rem',
-  fontWeight: 900,
-  letterSpacing: '0.05em',
-  textTransform: 'uppercase',
+  fontSize: '0.75rem',
+  fontWeight: 500,
   color: 'var(--text-muted)',
 };
 
@@ -60,7 +58,7 @@ const TitleRow: React.FC<{ item: VideoTitle; position: number; isTop: boolean }>
   >
     <div style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'baseline', flexWrap: 'wrap' }}>
       <span style={{ ...labelStyle, minWidth: '1.5rem' }}>{position + 1}</span>
-      <span style={{ fontSize: '0.95rem', fontWeight: 'bold', color: isTop ? 'var(--text-accent)' : 'var(--text-main)' }}>
+      <span style={{ fontSize: '0.95rem', fontWeight: 500, color: isTop ? 'var(--text-accent)' : 'var(--text-main)' }}>
         {item.title}
       </span>
       {isTop && <span className="status-badge">Top pick</span>}

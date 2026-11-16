@@ -116,7 +116,7 @@ export const CaptionStyler: React.FC<CaptionStylerProps> = ({ projectId, setting
             <span>Captions</span>
             {badge(false)}
           </button>
-          <p style={{ margin: 'var(--space-sm) 0 0 0', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+          <p style={{ margin: 'var(--space-sm) 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
             {presets?.[current.preset]?.label ?? current.preset}
             {overrideCount > 0 && ` · ${overrideCount} adjusted`}
             {' · applies to every clip that has not unlocked its own'}

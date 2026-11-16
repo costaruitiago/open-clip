@@ -172,7 +172,7 @@ export const ClipCaptionSettings: React.FC<ClipCaptionSettingsProps> = ({
         {preview ? (
           <div
             style={{
-              border: 'var(--border)',
+              border: 'var(--border)', borderRadius: 'var(--radius-lg)',
               marginInline: 'auto',
               // Capped by height rather than width: the dialog is portrait-hostile,
               // and a 9:16 clip given the full 620px would be taller than the screen.
@@ -212,7 +212,7 @@ export const ClipCaptionSettings: React.FC<ClipCaptionSettingsProps> = ({
             style={{
               margin: 0,
               padding: 'var(--space-md)',
-              border: 'var(--border-width) dashed var(--border-color)',
+              border: '1px dashed var(--hairline-strong)', borderRadius: 'var(--radius-lg)',
               textAlign: 'center',
               fontSize: '0.75rem',
             }}

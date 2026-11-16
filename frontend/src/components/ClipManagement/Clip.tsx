@@ -107,27 +107,27 @@ const postizButtonState = (clip: ClipData) => {
     return {
       tooltip: 'Already published from Postiz — importing again posts it a second time',
       label: 'Published from Postiz; import again to post it a second time',
-      colours: { backgroundColor: 'var(--success)', color: 'var(--on-success)' },
+      colours: { color: 'var(--success)' },
     };
   }
   if (clip.postizState === 'error') {
     return {
       tooltip: 'Postiz could not send this one — open Postiz for the reason',
       label: 'Postiz could not send this clip; import again to retry',
-      colours: { backgroundColor: 'var(--error)', color: 'var(--bg)' },
+      colours: { color: 'var(--error)' },
     };
   }
   if (clip.postizState === 'scheduled') {
     return {
       tooltip: 'Scheduled in Postiz — importing again adds a second post',
       label: 'Scheduled in Postiz; import again to add a second post',
-      colours: { borderColor: 'var(--accent)', color: 'var(--accent)' },
+      colours: { color: 'var(--accent)' },
     };
   }
   return {
     tooltip: 'Waiting in Postiz as a draft — importing again makes a second one',
     label: 'Waiting in Postiz; import again to make a second draft',
-    colours: { borderColor: 'var(--accent)', color: 'var(--accent)' },
+    colours: { color: 'var(--accent)' },
   };
 };
 
@@ -255,8 +255,8 @@ const ClipCard: React.FC<ClipProps> = ({ projectId, clip, sourceUrl, aspectRatio
       className="clip-card"
       style={{
         padding: '0',
-        backgroundColor: 'var(--bg)',
-        border: 'var(--border)',
+        backgroundColor: 'var(--bg-raised)',
+        border: 'var(--border)', borderRadius: 'var(--radius-lg)',
         animationDelay: `${enterDelayMs}ms`,
         position: 'relative',
       }}
@@ -363,7 +363,7 @@ const ClipCard: React.FC<ClipProps> = ({ projectId, clip, sourceUrl, aspectRatio
           }
         >
           <Button
-            variant="primary"
+            variant="ghost"
             onClick={() => setIsConfirmingUpload(true)}
             // Offered for a clip nobody has rendered: the upload cuts it first.
             // Refused while an import is running, which writes the same file.
@@ -385,16 +385,10 @@ const ClipCard: React.FC<ClipProps> = ({ projectId, clip, sourceUrl, aspectRatio
               alignItems: 'center',
               justifyContent: 'center',
               color: 'var(--accent)',
-              borderColor: 'var(--accent)',
-              // Stays --bg while uploading. A --text-muted fill put the accent
-              // label at 1.2:1 against its own button, hiding the control at
-              // the one moment it has something to report; aria-busy carries
-              // the state instead.
-              backgroundColor: 'var(--bg)',
             }}
           >
             {isUploading ? '...' : (
-              <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                 <polyline points="17 8 12 3 7 8"></polyline>
                 <line x1="12" y1="3" x2="12" y2="15"></line>
@@ -439,7 +433,7 @@ const ClipCard: React.FC<ClipProps> = ({ projectId, clip, sourceUrl, aspectRatio
             {isImporting ? '...' : (
               // A calendar with the clip's play triangle on it: scheduled, not
               // sent — which is the whole difference from the upload icon.
-              <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="5" width="18" height="16" rx="2" />
                 <line x1="3" y1="10" x2="21" y2="10" />
                 <line x1="8" y1="3" x2="8" y2="7" />
@@ -475,11 +469,10 @@ const ClipCard: React.FC<ClipProps> = ({ projectId, clip, sourceUrl, aspectRatio
               // Accent when this clip is off on its own — the exception, which
               // is what accent means everywhere else on the card. A locked
               // clip looks like every other card.
-              color: captions?.locked === false ? 'var(--accent)' : 'var(--text)',
-              borderColor: captions?.locked === false ? 'var(--accent)' : undefined,
+              color: captions?.locked === false ? 'var(--accent)' : undefined,
             }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               {captions?.locked === false ? (
                 // Open shackle: this clip is off on its own.
                 <>
@@ -518,12 +511,11 @@ const ClipCard: React.FC<ClipProps> = ({ projectId, clip, sourceUrl, aspectRatio
               justifyContent: 'center',
               // Read the same way as the caption lock beside it: a title of its
               // own is the exception.
-              color: ownsTitle ? 'var(--accent)' : 'var(--text)',
-              borderColor: ownsTitle ? 'var(--accent)' : undefined,
+              color: ownsTitle ? 'var(--accent)' : undefined,
             }}
           >
             {/* A capital T on a baseline: the mark for "type over this". */}
-            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 5h14M12 5v11" />
               <path d="M4 21h16" />
             </svg>
@@ -546,7 +538,7 @@ const ClipCard: React.FC<ClipProps> = ({ projectId, clip, sourceUrl, aspectRatio
             }}
           >
             {/* Scissors: the edges of the clip, cut. */}
-            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="6" cy="6" r="3" />
               <circle cx="6" cy="18" r="3" />
               <line x1="20" y1="4" x2="8.12" y2="15.88" />
@@ -572,7 +564,7 @@ const ClipCard: React.FC<ClipProps> = ({ projectId, clip, sourceUrl, aspectRatio
               color: 'var(--text)',
             }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
               <circle cx="12" cy="12" r="3"></circle>
             </svg>
@@ -593,10 +585,9 @@ const ClipCard: React.FC<ClipProps> = ({ projectId, clip, sourceUrl, aspectRatio
               alignItems: 'center',
               justifyContent: 'center',
               color: 'var(--error)',
-              borderColor: 'var(--error)'
             }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
             </svg>
           </Button>
@@ -615,7 +606,7 @@ const ClipCard: React.FC<ClipProps> = ({ projectId, clip, sourceUrl, aspectRatio
             border: `var(--border-width) solid ${actionResult.ok ? 'var(--success)' : 'var(--error)'}`,
             color: actionResult.ok ? 'var(--text)' : 'var(--error)',
             fontSize: '0.8rem',
-            fontWeight: 900,
+            fontWeight: 500,
             textAlign: 'left',
             display: 'flex',
             alignItems: 'flex-start',
@@ -659,10 +650,10 @@ const ClipCard: React.FC<ClipProps> = ({ projectId, clip, sourceUrl, aspectRatio
               background: 'transparent',
               color: 'inherit',
               cursor: 'pointer',
-              fontWeight: 900,
+              fontWeight: 500,
             }}
           >
-            ✕
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
           </button>
         </div>
       )}
@@ -727,7 +718,7 @@ const ClipCard: React.FC<ClipProps> = ({ projectId, clip, sourceUrl, aspectRatio
         ]
           .filter(Boolean)
           .join(' ')}
-        confirmText="UPLOAD"
+        confirmText="Upload"
         onConfirm={handleUpload}
         onCancel={() => setIsConfirmingUpload(false)}
       />

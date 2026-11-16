@@ -57,7 +57,7 @@ export const PongGame: React.FC<{ active: boolean }> = ({ active }) => {
 
   return (
     <div ref={containerRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0, pointerEvents: 'none' }}>
-      <div style={{ position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)', fontSize: '2rem', fontWeight: 900, color: 'var(--text)', opacity: 0.3 }}>
+      <div style={{ position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)', fontSize: '2rem', fontWeight: 500, color: 'var(--text)', opacity: 0.3 }}>
         {score.player} : {score.ai}
       </div>
       <div style={{ position: 'absolute', left: ball.x, top: ball.y, width: BALL_SIZE, height: BALL_SIZE, background: 'var(--accent)', borderRadius: '50%' }} />

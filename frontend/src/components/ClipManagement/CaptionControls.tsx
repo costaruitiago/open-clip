@@ -55,19 +55,17 @@ const COLORS: Array<{ key: keyof CaptionStyle; label: string }> = [
 ];
 
 const labelStyle: React.CSSProperties = {
-  fontWeight: 900,
-  textTransform: 'uppercase',
-  fontSize: '0.7rem',
-  letterSpacing: '0.05em',
+  fontWeight: 500,
+  fontSize: '0.75rem',
 };
 
 const controlStyle: React.CSSProperties = {
   width: '100%',
   padding: '0.4rem',
-  border: '2px solid var(--border-color)',
+  border: 'var(--border)', borderRadius: 'var(--radius)',
   background: 'var(--bg)',
   color: 'var(--text)',
-  fontWeight: 700,
+  fontWeight: 500,
   fontSize: '0.8rem',
   minHeight: '44px',
 };
@@ -124,7 +122,7 @@ export const CaptionControls: React.FC<CaptionControlsProps> = ({
             <option key={name} value={name}>{preset.label}</option>
           ))}
         </select>
-        <p style={{ margin: 'var(--space-sm) 0 0 0', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+        <p style={{ margin: 'var(--space-sm) 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
           {presets?.[settings.preset]?.description}
         </p>
       </div>
@@ -227,8 +225,7 @@ export const CaptionControls: React.FC<CaptionControlsProps> = ({
             style={{
               ...controlStyle,
               cursor: 'pointer',
-              textTransform: 'uppercase',
-              fontWeight: 900,
+              fontWeight: 500,
             }}
           >
             Reset to preset

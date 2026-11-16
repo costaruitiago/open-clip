@@ -110,19 +110,19 @@ export const PromoteToDefaults: React.FC<PromoteToDefaultsProps> = ({
         {mutation.isPending ? 'Saving…' : 'Save as application default'}
       </Button>
 
-      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
         {nothingToPromote ? emptyHint ?? 'Nothing here differs from the application settings.' : hint}
       </span>
 
       {/* Live rather than announced on mount: the button stays where it is and
           only the line under it changes, which a screen reader would otherwise
           never reach. */}
-      <span role="status" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+      <span role="status" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
         {mutation.isSuccess && !mutation.isPending && 'Saved to the application settings.'}
       </span>
 
       {mutation.isError && (
-        <span role="alert" style={{ fontSize: '0.7rem', color: 'var(--error)', lineHeight: 1.4 }}>
+        <span role="alert" style={{ fontSize: '0.75rem', color: 'var(--error)', lineHeight: 1.4 }}>
           Could not save these as the application default. The application settings are unchanged;
           this project keeps what it has either way.
         </span>

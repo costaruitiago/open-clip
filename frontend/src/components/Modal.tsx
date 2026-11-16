@@ -112,8 +112,8 @@ export const Modal: React.FC<ModalProps> = ({
         style={{
           backgroundColor: 'var(--bg)',
           color: 'var(--text)',
-          border: 'var(--border)',
-          boxShadow: '8px 8px 0px var(--accent)',
+          border: 'var(--border)', borderRadius: 'var(--radius-lg)',
+          boxShadow: 'var(--shadow-float)',
           width: '100%',
           maxWidth,
           // The panel, not the page, is what scrolls when the content is
@@ -140,11 +140,11 @@ export const Modal: React.FC<ModalProps> = ({
               background: 'transparent',
               color: 'var(--text)',
               cursor: 'pointer',
-              fontWeight: 900,
+              fontWeight: 500,
               fontSize: '1rem',
             }}
           >
-            ✕
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
           </button>
         </div>
 

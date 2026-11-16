@@ -14,12 +14,12 @@ export function Navigation({ onHistoryClick }: NavigationProps) {
       aria-label="Primary"
       style={{
         display: 'flex',
-        gap: 'var(--space-sm)',
+        gap: 'var(--space-xs)',
         alignItems: 'center'
       }}
     >
-      <NavButton onClick={onHistoryClick}>PROJECTS</NavButton>
-      <NavButton onClick={() => navigate('/settings')}>SETTINGS</NavButton>
+      <NavButton onClick={onHistoryClick}>Projects</NavButton>
+      <NavButton onClick={() => navigate('/settings')}>Settings</NavButton>
     </nav>
   );
 }

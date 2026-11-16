@@ -59,29 +59,28 @@ const inputStyle: React.CSSProperties = {
   padding: 'var(--space-md)',
   background: 'var(--bg)',
   color: 'var(--text)',
-  border: 'var(--border)',
+  border: 'var(--border)', borderRadius: 'var(--radius)',
   fontFamily: 'inherit',
   width: '100%',
 };
 
 // Labels are bold but not uppercase: uppercase belongs to the card titles, so
 // a group and a field inside it no longer look alike.
-const labelStyle: React.CSSProperties = { fontWeight: 'bold', fontSize: '0.9rem' };
+const labelStyle: React.CSSProperties = { fontWeight: 500, fontSize: '0.9rem' };
 const hintStyle: React.CSSProperties = { fontSize: '0.8rem', opacity: 0.6 };
-const errorStyle: React.CSSProperties = { fontSize: '0.8rem', color: 'var(--error)', fontWeight: 'bold' };
+const errorStyle: React.CSSProperties = { fontSize: '0.8rem', color: 'var(--error)', fontWeight: 500 };
 const buttonStyle: React.CSSProperties = {
   padding: 'var(--space-xs) var(--space-sm)',
   minHeight: '44px',
-  fontWeight: 'bold',
-  textTransform: 'uppercase',
+  fontWeight: 500,
   fontSize: '0.8rem',
   alignSelf: 'flex-start',
 };
 
 /** A titled group of related fields. Every group on the page is one of these. */
 const Card: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)', border: 'var(--border)', padding: 'var(--space-md)' }}>
-    <h3 style={{ margin: 0, fontSize: '1rem', textTransform: 'uppercase', fontWeight: 900 }}>{title}</h3>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)', border: 'var(--border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-md)' }}>
+    <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 500 }}>{title}</h3>
     {children}
   </div>
 );
@@ -409,7 +408,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
     }
   }, [debouncedTypesafeUrl, typesafeUrl, data, initialized, saveSettings]);
 
-  if (isLoading) return <div style={{ padding: 'var(--space-md)', fontWeight: 'bold', textTransform: 'uppercase' }}>Loading settings...</div>;
+  if (isLoading) return <div style={{ padding: 'var(--space-md)', fontWeight: 500}}>Loading settings...</div>;
 
   const settings = data?.settings || { gemini_api_key: '', youtube_client_secrets: null, theme: 'light' as const, video_defaults: { resolution: 'keep original', aspect_ratio: 'keep original' } };
   const pipelineConfig = data?.pipeline_config || { execution_order: [], steps: {} };
@@ -437,10 +436,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
   };
 
   const getSaveStatus = () => {
-    if (updateMutation.isError) return { text: 'ERROR SAVING!', color: 'var(--error)' };
-    if (updateMutation.isPending) return { text: 'SAVING...', color: 'var(--text)' };
-    if (updateMutation.isSuccess) return { text: 'SAVED!', color: 'green' };
-    return { text: 'All changes saved', color: 'var(--text)', opacity: 0.6 };
+    if (updateMutation.isError) return { text: 'Could not save', color: 'var(--error)' };
+    if (updateMutation.isPending) return { text: 'Saving…', color: 'var(--text-muted)' };
+    if (updateMutation.isSuccess) return { text: 'Saved', color: 'var(--text-muted)' };
+    return { text: 'All changes saved', color: 'var(--text-muted)' };
   };
 
   const status = getSaveStatus();
@@ -510,15 +509,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
               aria-pressed={theme === t}
               style={{
                 padding: 'var(--space-md) var(--space-lg)',
-                background: theme === t ? 'var(--text)' : 'var(--bg)',
-                color: theme === t ? 'var(--bg)' : 'var(--text)',
-                border: 'var(--border)',
-                fontWeight: 'bold',
-                textTransform: 'uppercase',
+                background: theme === t ? 'var(--bg-secondary)' : 'var(--bg-raised)',
+                color: theme === t ? 'var(--text)' : 'var(--text-secondary)',
+                border: 'var(--border)', borderRadius: 'var(--radius)',
+                fontWeight: 500,
                 cursor: 'pointer',
               }}
             >
-              {t}
+              {t === 'light' ? 'Light' : 'Dark'}
             </button>
           ))}
         </div>
@@ -602,9 +600,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
               htmlFor="file-input"
               style={{
                 padding: 'var(--space-xs) var(--space-sm)',
-                border: 'var(--border)',
-                fontWeight: 'bold',
-                textTransform: 'uppercase',
+                border: 'var(--border)', borderRadius: 'var(--radius)',
+                fontWeight: 500,
                 cursor: 'pointer',
                 background: 'var(--bg)',
                 fontSize: '0.8rem',
@@ -857,7 +854,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
             style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-xs)' }}
           >
             <div style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.9rem', fontWeight: 'bold', flex: 1 }}>{channel.title}</span>
+              <span style={{ fontSize: '0.9rem', fontWeight: 500, flex: 1 }}>{channel.title}</span>
               <button
                 type="button"
                 className="text-action"
@@ -1247,7 +1244,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
             borderBottom: 'var(--border)',
           }}>
             <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <span style={{ fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>{stepLabel(step)}</span>
+              <span style={{ fontWeight: 500}}>{stepLabel(step)}</span>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                 {dependsOn.length ? `After ${dependsOn.map(stepLabel).join(' and ')}` : 'Runs first'}
               </span>
@@ -1257,8 +1254,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
               alignItems: 'center',
               gap: '8px',
               fontSize: '0.8rem',
-              fontWeight: 'bold',
-              textTransform: 'uppercase',
+              fontWeight: 500,
               cursor: 'pointer',
             }}>
               <input
@@ -1312,16 +1308,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
       }}>
         <h1 style={{
           fontSize: '2.5rem',
-          fontWeight: 900,
-          textTransform: 'uppercase',
+          fontWeight: 500,
           margin: 0,
         }}>Settings</h1>
         <span style={{
           fontSize: '0.8rem',
-          fontWeight: 'bold',
-          textTransform: 'uppercase',
+          fontWeight: 500,
           color: status.color,
-          opacity: status.opacity || 1,
         }}>
           {status.text}
         </span>
@@ -1332,8 +1325,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
           border: '1px solid var(--error)',
           padding: 'var(--space-sm)',
           color: 'var(--error)',
-          fontWeight: 'bold',
-          textTransform: 'uppercase',
+          fontWeight: 500,
         }}>
           Failed to save settings. Please check your connection.
         </div>
@@ -1354,11 +1346,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, setTheme }) =
             style={{
               padding: 'var(--space-sm) var(--space-md)',
               minHeight: '44px',
-              background: tab === id ? 'var(--text)' : 'var(--bg)',
-              color: tab === id ? 'var(--bg)' : 'var(--text)',
-              border: 'var(--border)',
-              fontWeight: 'bold',
-              textTransform: 'uppercase',
+              background: tab === id ? 'var(--bg-secondary)' : 'transparent',
+              color: tab === id ? 'var(--text)' : 'var(--text-secondary)',
+              border: 'var(--border)', borderRadius: 'var(--radius)',
+              fontWeight: 500,
               fontSize: '0.8rem',
               whiteSpace: 'nowrap',
               cursor: 'pointer',

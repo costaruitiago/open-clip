@@ -67,10 +67,9 @@ const OutputTable: React.FC<{ rows: Record<string, unknown>[]; label: string }> 
                 style={{
                   textAlign: 'left',
                   padding: 'var(--space-xs) var(--space-sm)',
-                  borderBottom: '2px solid var(--border-color)',
+                  borderBottom: 'var(--border)',
                   color: 'var(--text-muted)',
-                  fontSize: '0.65rem',
-                  textTransform: 'uppercase',
+                  fontSize: '0.75rem',
                   whiteSpace: 'nowrap',
                 }}
               >
@@ -105,7 +104,7 @@ const OutputTable: React.FC<{ rows: Record<string, unknown>[]; label: string }> 
         </tbody>
       </table>
       {rows.length > ROW_LIMIT && (
-        <p style={{ margin: 'var(--space-sm) 0 0 0', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+        <p style={{ margin: 'var(--space-sm) 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
           Showing the first {ROW_LIMIT} of {rows.length} rows.
         </p>
       )}
@@ -123,8 +122,8 @@ export const LlmOutputs: React.FC<LlmOutputsProps> = ({ projectId, outputs }) =>
         const CustomPanel = CUSTOM_PANELS[task];
         const rows = CustomPanel ? null : toRows(value);
         return (
-          <details key={task} open style={{ border: 'var(--border)', padding: 'var(--space-sm)' }}>
-            <summary style={{ cursor: 'pointer', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <details key={task} open style={{ border: 'var(--border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-sm)' }}>
+            <summary style={{ cursor: 'pointer', fontWeight: 500}}>
               {stepLabel(task)}
             </summary>
             <div style={{ marginTop: 'var(--space-sm)' }}>

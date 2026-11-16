@@ -2,73 +2,83 @@
   box-sizing: border-box;
 }
 
+/* Graphite, not tinted: the clips are the colour on every page, and a
+   surface that leans toward any hue would fight the footage. The accent is
+   the brand ember, used for what is happening now and almost nothing else. */
 :root {
-  --bg: #F9F9F9;
-  --text: #121212;
-  /* Brand orange, darkened from the #FF3E00 in DESIGN.md so it clears 4.5:1 as
-     text and as a fill behind --bg text. #FF3E00 itself is 3.36:1 on --bg and
-     was never usable for the running-step label or the highlight hook. */
-  --accent: #C42F00;
-  --success: #00FF41;
-  --error: #D40000;
-  /* A step that did some of its clips and not the rest. Amber rather than a
-     faded green or a second red, because it has to be told apart from both at a
-     glance, and because it is the one status the user is meant to press. */
-  --warning: #FFB000;
-  --on-warning: #121212;
-  /* The same fact as text on --bg rather than as a fill: #FFB000 is 1.7:1 there
-     and unreadable, so the sentence under the row gets its own darker value. */
-  --warning-text: #8A5A00;
+  --bg: #FAFAFA;
+  --bg-raised: #FFFFFF;
+  --bg-secondary: #F4F4F5;
+  --text: #171717;
   --text-main: var(--text);
-  --text-muted: #6B6B6B;
-  /* What a dead label is painted in, rather than a faded live one. Fading text
-     with `opacity` is how a checked colour silently stops passing: 0.5 over
-     --text-muted lands at 2.0:1. This is 4.8:1, because a disabled control's
-     label is where the reason for the disabling lives and still has to be
-     read. What marks it as dead is the missing underline and the cursor. */
-  --text-disabled: #6E6E6E;
+  --text-secondary: #525252;
+  /* 4.7:1 on --bg. Meta and captions only. */
+  --text-muted: #737373;
+  /* Dead text keeps a checked contrast; what marks it as dead is the missing
+     underline and the cursor, never a fade below AA. */
+  --text-disabled: #737373;
+  /* Brand ember, 5.3:1 on --bg as text and behind --on-accent. */
+  --accent: #C42F00;
   --text-accent: var(--accent);
-  --on-success: #121212;
-  --bg-secondary: #EDEDED;
-  --border-width: 4px;
-  --border-color: var(--text);
+  --on-accent: #FFFFFF;
+  --success: #16A34A;
+  --on-success: #171717;
+  --error: #DC2626;
+  /* A step that did some of its clips and not the rest: told apart from both
+     green and red at a glance, and the one status the user is meant to press. */
+  --warning: #D97706;
+  --on-warning: #171717;
+  --warning-text: #8A5A00;
+  --hairline: rgba(23, 23, 23, 0.1);
+  --hairline-strong: rgba(23, 23, 23, 0.18);
+  --border-width: 1px;
+  --border-color: var(--hairline);
   --border: var(--border-width) solid var(--border-color);
-  --btn-hover-bg: var(--text);
-  --btn-hover-text: var(--bg);
-  --space-xs: 0.125rem;
-  --space-sm: 0.25rem;
-  --space-md: 0.75rem;
-  --space-lg: 1rem;
-  --space-xl: 2rem;
-  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --btn-hover-bg: var(--bg-secondary);
+  --btn-hover-text: var(--text);
+  --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 32px;
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  /* One curve for everything. The name predates the value. */
+  --ease-out-quart: cubic-bezier(0.22, 1, 0.36, 1);
+  color-scheme: light;
 }
 
 [data-theme='dark'] {
-  --bg: #121212;
-  --text: #F9F9F9;
-  --border-color: #FFFFFF;
-  /* The light-theme accent is 2.4:1 here, so it forks the same way --success
-     and --error do rather than carrying one value across both themes. */
+  --bg: #141415;
+  --bg-raised: #19191B;
+  --bg-secondary: #232325;
+  --text: #EDEDED;
+  --text-secondary: #A1A1A6;
+  --text-muted: #85858B;
+  --text-disabled: #85858B;
   --accent: #FF7A52;
-  --success: #00CC33;
-  --error: #FF4D4D;
-  /* Held down from the light theme's #FFB000 for the same reason --success is:
-     a full-brightness amber fill glares against #121212. */
+  --on-accent: #141415;
+  --success: #4CC38A;
+  --on-success: #141415;
+  --error: #E5484D;
   --warning: #E09A00;
-  --on-warning: #121212;
-  /* 7.4:1 on the dark background, where the light theme's #8A5A00 is 2.1:1. */
+  --on-warning: #141415;
   --warning-text: #FFB000;
-  --text-muted: #A0A0A0;
-  /* 5.1:1 here, the same job as its light-theme twin. */
-  --text-disabled: #858585;
-  --bg-secondary: #1E1E1E;
-  --btn-hover-bg: #2A2A2A;
-  --btn-hover-text: var(--text);
+  --hairline: rgba(237, 237, 237, 0.08);
+  --hairline-strong: rgba(237, 237, 237, 0.16);
+  --btn-hover-bg: #2A2A2D;
+  --shadow-float: 0 12px 32px rgba(0, 0, 0, 0.4);
+  color-scheme: dark;
 }
 
 :focus-visible {
-  outline: 4px solid var(--accent);
-  outline-offset: 3px;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* Announced but not painted. For text that exists to give a screen reader the
@@ -92,12 +102,12 @@
   left: -9999px;
   top: 0;
   z-index: 1100;
-  padding: var(--space-md);
-  background: var(--bg);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-raised);
   color: var(--text);
   border: var(--border);
-  font-weight: 900;
-  text-transform: uppercase;
+  border-radius: var(--radius);
+  font-weight: 500;
   text-decoration: none;
 }
 
@@ -109,36 +119,64 @@
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   margin: 0;
   padding: 0;
 }
 
+input,
+select,
+textarea {
+  font: inherit;
+}
+
 h1 {
-  font-size: clamp(3rem, 10vw, 6rem);
-  font-weight: 900;
-  letter-spacing: -0.04em;
-  text-transform: uppercase;
+  font-size: clamp(1.75rem, 3vw, 2rem);
+  font-weight: 500;
+  letter-spacing: -0.01em;
   margin: 0;
-  line-height: 0.9;
+  line-height: 1.15;
 }
 
 h2 {
-  font-size: clamp(2rem, 5vw, 3rem);
-  font-weight: 900;
-  text-transform: uppercase;
+  font-size: 1.25rem;
+  font-weight: 500;
   margin: var(--space-md) 0;
-  letter-spacing: -0.02em;
+  line-height: 1.3;
 }
 
-/* Links.
-   ------------------------------------------------------------------------
-   There was no rule for `a` at all, so every link in the application rendered
-   in the user agent's default blue: #0000EE, which is 2.3:1 on the dark
-   theme's background and belongs to no palette in this system. Accent instead
-   — 5.31:1 light, 7.28:1 dark — and underlined, because colour alone is not
-   what tells you a thing is a link. */
+h3 {
+  font-weight: 500;
+}
+
+/* Timecodes, scores and counts. The edit bay's readout: fixed-width figures
+   so a ticking number does not shuffle the row it sits in. */
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Keyboard keys named in running text. */
+.keycap {
+  display: inline-block;
+  min-width: 20px;
+  padding: 0 5px;
+  border: var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--bg-raised);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 18px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+/* Accent and underlined: colour alone is not what tells you a thing is a
+   link. 5.3:1 light, 7.3:1 dark. */
 a {
   color: var(--text-accent);
   text-underline-offset: 3px;
@@ -151,122 +189,100 @@ a {
 }
 
 button {
-  background: transparent;
+  font: inherit;
+  font-weight: 500;
+  background: var(--bg-raised);
   border: var(--border);
+  border-radius: var(--radius);
   color: var(--text);
-  text-transform: uppercase;
-  font-weight: 900;
   cursor: pointer;
-  transition: transform 200ms var(--ease-out-quart), background 200ms var(--ease-out-quart), color 200ms var(--ease-out-quart);
+  transition:
+    background-color 150ms var(--ease-out-quart),
+    border-color 150ms var(--ease-out-quart),
+    color 150ms var(--ease-out-quart),
+    transform 150ms var(--ease-out-quart);
 }
 
 .btn-sm {
-  padding: 0.4rem 0.8rem;
-  font-size: 0.75rem;
+  padding: 4px var(--space-md);
+  font-size: 0.8125rem;
 }
 
 .btn-md {
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
+  padding: var(--space-sm) var(--space-lg);
+  font-size: 0.875rem;
 }
 
 .btn-lg {
-  padding: 1rem 2rem;
-  font-size: 1.25rem;
+  padding: var(--space-md) 20px;
+  font-size: 0.9375rem;
 }
 
 .btn-primary {
   background: var(--text);
   color: var(--bg);
-  border: var(--border);
+  border-color: transparent;
 }
 
 .btn-ghost {
-  background: transparent;
+  background: var(--bg-raised);
   color: var(--text);
-  border: var(--border);
 }
 
 .btn-danger {
   background: transparent;
   color: var(--error);
-  border: var(--border-width) solid var(--error);
 }
 
-/* Hover, only where a pointer can actually hover.
-   ------------------------------------------------------------------------
-   A touch browser applies :hover on tap and leaves it applied until the user
-   taps something else, so unguarded hover styles left buttons stuck in their
-   inverted state across a whole session. `:active` is outside the guard
-   because press feedback is wanted on every input type. */
-
+/* Hover, only where a pointer can actually hover. A touch browser applies
+   :hover on tap and leaves it applied, so unguarded hover styles left buttons
+   stuck in their hover state. `:active` is outside the guard because press
+   feedback is wanted on every input type. */
 @media (hover: hover) and (pointer: fine) {
-  /* `:not(:disabled)` throughout. Without it a dead button still inverted and
-     shifted under the pointer, which is the app promising a press it will not
-     accept. */
-  .btn-primary:not(:disabled):hover {
+  button:not(:disabled):hover {
     background: var(--btn-hover-bg);
-    color: var(--btn-hover-text);
-    transform: translate(2px, 2px);
   }
 
-  .btn-ghost:not(:disabled):hover {
-    background: var(--btn-hover-bg);
-    color: var(--btn-hover-text);
-    transform: translate(2px, 2px);
+  .btn-primary:not(:disabled):hover {
+    background: var(--text);
+    color: var(--bg);
+    opacity: 0.88;
   }
 
   .btn-danger:not(:disabled):hover {
-    background: var(--error);
-    color: var(--bg);
-    transform: translate(2px, 2px);
-  }
-
-  [data-theme='dark'] .btn-primary:not(:disabled):hover {
-    background: #FFFFFF;
-    color: var(--bg);
-  }
-
-  .brutalist-card-interactive:hover {
-    transform: translate(4px, 4px);
+    background: color-mix(in srgb, var(--error) 10%, transparent);
+    border-color: color-mix(in srgb, var(--error) 40%, transparent);
   }
 }
 
 button:not(:disabled):active {
-  transform: translate(4px, 4px);
+  transform: scale(0.98);
 }
 
-/* The one disabled treatment.
-   ------------------------------------------------------------------------
-   The system had none, so every component that needed a dead button wrote its
-   own `opacity: 0.5` inline — which is a literal, and which lands differently
-   on a filled button than on a ghost one. Kept above the AA floor for text
-   that still has to be read: a disabled control is exempt from 1.4.3, but the
-   label is usually where the reason lives ("render the clip first"). */
+/* The one disabled treatment: a fade on the whole control. Labels that carry
+   the reason for the disabling use --text-disabled instead (see .text-action). */
 button:disabled,
 button[aria-disabled='true'] {
-  opacity: 0.55;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
-[data-theme='dark'] .btn-primary {
-  background: #E0E0E0;
-  color: var(--bg);
-  border: var(--border-width) solid #FFFFFF;
+input[type='text'],
+input[type='number'],
+input[type='url'],
+input[type='password'],
+input[type='date'],
+input[type='datetime-local'],
+input[type='time'],
+input[type='search'],
+select,
+textarea {
+  border-radius: var(--radius);
 }
-
 
 @keyframes entrance {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
-}
-
-/* Translated rather than animating `background-position`, which repainted the
-   button on every frame for as long as a step was running. A transform is
-   composited instead, so the sheen costs nothing on the main thread. */
-@keyframes sheen {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(100%); }
 }
 
 @keyframes spin {
@@ -283,31 +299,14 @@ button[aria-disabled='true'] {
   transform-origin: center;
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
-}
-
-@keyframes slide-up {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* Replaces the previous three-stage `bounce`. Overshoot easing reads as dated
-   and the old version animated in four discrete hops; this is a single nudge. */
-@keyframes nudge {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
-}
-
-@keyframes success-pop {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
+/* Live, so it may move: a step that is running right now. */
+@keyframes live {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
 }
 
 .menu-enter {
-  animation: entrance 140ms var(--ease-out-quart);
+  animation: entrance 180ms var(--ease-out-quart);
 }
 
 .panel-enter {
@@ -318,6 +317,7 @@ button[aria-disabled='true'] {
    stagger delay so a card does not flash before its turn. */
 .clip-card {
   animation: entrance 300ms var(--ease-out-quart) both;
+  border-radius: var(--radius-lg);
   /* Queried below rather than the viewport. How wide a card is depends on the
      project's target ratio as much as on the screen: a 9:16 project gets 224px
      cards on a 27" monitor, and a phone gets one card the full width of a
@@ -327,8 +327,7 @@ button[aria-disabled='true'] {
 
 /* A container is a stacking context, so a tooltip escaping the card's right
    edge would be painted over by the next card in the grid. The card the user
-   is actually pointing at — or tabbing through — comes forward instead. Below
-   the AI Steps dropdown at 20. */
+   is actually pointing at, or tabbing through, comes forward instead. */
 .clip-card:hover,
 .clip-card:focus-within {
   z-index: 3;
@@ -338,6 +337,15 @@ button[aria-disabled='true'] {
   position: relative;
   background: #000;
   line-height: 0;
+  /* The card's 12px less its 1px border. Not overflow:hidden, which would
+     clip the score breakdown that drops out of the overlay. */
+  border-radius: 11px 11px 0 0;
+}
+
+.clip-card__media video,
+.clip-card__media .clip-media-frame,
+.clip-card__media .clip-media-placeholder {
+  border-radius: 11px 11px 0 0;
 }
 
 /* Everything that draws the picture — the player's frame, the video inside it,
@@ -383,6 +391,7 @@ button[aria-disabled='true'] {
    is set per clip, the same variable the grid uses. */
 .trim-video {
   border: var(--border);
+  border-radius: var(--radius-lg);
   margin-inline: auto;
   width: 100%;
   max-width: calc(var(--trim-media-h, 58vh) * var(--clip-ratio, 1.7778));
@@ -415,12 +424,13 @@ button[aria-disabled='true'] {
   pointer-events: auto;
   margin-left: auto;
   padding: 2px 6px;
-  background: #000;
-  color: #F9F9F9;
-  border: 1px solid #F9F9F9;
-  font-size: 0.65rem;
-  font-weight: 900;
-  letter-spacing: 0.05em;
+  background: rgba(0, 0, 0, 0.72);
+  color: #EDEDED;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 16px;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
   cursor: help;
@@ -435,14 +445,15 @@ button[aria-disabled='true'] {
   top: calc(100% + 4px);
   right: 0;
   min-width: 220px;
-  padding: var(--space-sm);
-  background: #000;
-  color: #F9F9F9;
-  border: 1px solid #F9F9F9;
+  padding: var(--space-sm) var(--space-md);
+  background: #19191B;
+  color: #EDEDED;
+  border: 1px solid rgba(237, 237, 237, 0.12);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
   flex-direction: column;
   gap: 4px;
-  font-weight: 700;
-  letter-spacing: normal;
+  font-weight: 400;
   white-space: normal;
   z-index: 3;
 }
@@ -463,18 +474,18 @@ button[aria-disabled='true'] {
 }
 .jev-tag {
   padding: 2px 6px;
-  background: var(--accent);
-  color: #000;
-  font-size: 0.6rem;
-  font-weight: 900;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  background: rgba(0, 0, 0, 0.72);
+  color: #EDEDED;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 16px;
   white-space: nowrap;
 }
 .jev-score__total {
   margin-top: 2px;
   padding-top: 4px;
-  border-top: 1px solid #F9F9F9;
+  border-top: 1px solid rgba(237, 237, 237, 0.12);
 }
 
 /* Moments below the Jev cutoff: still usable, visibly not the project's clips. */
@@ -507,8 +518,8 @@ button[aria-disabled='true'] {
   overflow: hidden;
   margin: 0;
   padding: var(--space-md) var(--space-md) 0 var(--space-md);
-  font-size: 0.85rem;
-  font-weight: 800;
+  font-size: 0.875rem;
+  font-weight: 500;
   line-height: 1.35;
   color: var(--text);
   /* Model output, so there is no promise of a break opportunity. */
@@ -517,13 +528,33 @@ button[aria-disabled='true'] {
 
 .clip-card__actions {
   display: flex;
+  align-items: center;
   /* The last defence if a card ends up narrower than the row needs — a wrapped
      second line of buttons is survivable, four buttons hanging over the card's
      border is not. */
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
   padding: var(--space-sm) var(--space-md) var(--space-md) var(--space-md);
+}
+
+/* Icon buttons, quiet until pointed at. Colour on one of them is a state:
+   accent for publish and for a clip that has left the project's defaults,
+   green or red for what Postiz did with it. */
+.clip-card__actions button {
+  min-width: 36px !important;
+  min-height: 36px !important;
+  padding: 0 !important;
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+@media (pointer: coarse) {
+  .clip-card__actions button {
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
 }
 
 /* A finger is not a cursor: 4px between two 44px targets is enough for a
@@ -539,51 +570,12 @@ button[aria-disabled='true'] {
    two-line title is 0.85rem on the narrow cards a portrait project produces,
    and full size on the wide ones — and on a phone, where the card is the
    screen, it lands at the 16px a phone deserves. */
-@container (min-width: 260px) {
-  .clip-card__title {
-    font-size: 0.95rem;
-  }
-}
-
 @container (min-width: 330px) {
   .clip-card__title {
-    font-size: 1rem;
+    font-size: 0.9375rem;
   }
 }
 
-
-/* One-shot sweeps. Both are gated in JS on a transition that happened while
-   the page was open, so opening a project that is already finished — or
-   already rendered — is silent. */
-@keyframes flourish-sweep {
-  from { transform: translateX(-100%); opacity: 1; }
-  to { transform: translateX(100%); opacity: 0; }
-}
-
-.sweep-clip {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-  /* Below the AI Steps dropdown, which sits at 20. */
-  z-index: 1;
-}
-
-.sweep-band {
-  position: absolute;
-  inset: 0;
-  animation: flourish-sweep 900ms var(--ease-out-quart) forwards;
-}
-
-.sweep-band--success {
-  background: linear-gradient(110deg, transparent 40%, var(--success) 50%, transparent 60%);
-  opacity: 0.45;
-}
-
-.sweep-band--accent {
-  background: linear-gradient(110deg, transparent 40%, var(--accent) 50%, transparent 60%);
-  opacity: 0.35;
-}
 
 /* Stroke drawn on rather than the icon simply appearing. 24 is the rough path
    length of the check below. */
@@ -597,45 +589,59 @@ button[aria-disabled='true'] {
   animation: draw-check 400ms var(--ease-out-quart) forwards;
 }
 
-.pipeline-step-running {
-  position: relative;
-  overflow: hidden;
-}
-
-.pipeline-step-running::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(110deg, transparent 40%, rgba(255, 255, 255, 0.25) 50%, transparent 60%);
-  animation: sheen 2s infinite linear;
-  pointer-events: none;
-}
-
-.pipeline-step-success {
-  animation: success-pop 0.3s var(--ease-out-quart);
-}
-
-.pipeline-step-error {
-  background: var(--error);
-  color: var(--bg);
-  border-color: var(--error);
-}
-
 .pipeline-step-btn {
-  transition: all 200ms var(--ease-out-quart);
+  transition:
+    background-color 150ms var(--ease-out-quart),
+    border-color 150ms var(--ease-out-quart),
+    color 150ms var(--ease-out-quart),
+    transform 150ms var(--ease-out-quart);
 }
 
-.pipeline-step-btn:active {
-  transform: translate(4px, 4px) !important;
-  transition: all 0ms !important;
+/* Every step carries a status dot ahead of its name: green done, amber partly
+   done, a hairline ring still to do. A running step's dot takes the accent and
+   breathes, the one thing in the chrome that moves, because it is the one thing
+   that is happening. The label beside it still says the state in words. */
+.pipeline-step > span:first-child::before,
+.status-badge[style*='--step-dot']::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-inline-end: var(--space-sm);
+  border-radius: 50%;
+  background: var(--step-dot, var(--hairline-strong));
+  vertical-align: middle;
+  transform: translateY(-1px);
 }
 
-/* The state pill promised by DESIGN.md. Colour is passed in by the caller,
-   because what a state means is the caller's business; everything that makes
-   it read as the same object across the app lives here. */
+.pipeline-step-running > span:first-child::before {
+  background: currentColor;
+  animation: live 1.6s var(--ease-out-quart) infinite;
+}
+
+/* The whole run landing, said once: a flat wash of the done colour that fades.
+   Gated in JS on a transition seen while the page was open. */
+@keyframes settle {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.sweep-clip {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* Below the AI steps dropdown, which sits at 20. */
+  z-index: 1;
+}
+
+.sweep-band {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+  animation: settle 900ms var(--ease-out-quart) forwards;
+}
+
 /* Secondary actions that are not the point of the page. Still a real button or
    anchor — only the weight changes, so keyboard and screen reader behaviour is
    untouched. 44px of hit area is preserved through padding. */
@@ -649,12 +655,11 @@ button[aria-disabled='true'] {
   border: none;
   padding: var(--space-md) 0;
   min-height: 44px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-secondary);
   text-decoration: underline;
+  text-decoration-color: var(--hairline-strong);
   text-underline-offset: 4px;
   cursor: pointer;
   /* `start`, not `left`: these are logical rows and one of them is a label
@@ -668,7 +673,9 @@ button[aria-disabled='true'] {
 
 @media (hover: hover) and (pointer: fine) {
   .text-action:hover {
+    background: none;
     color: var(--text);
+    text-decoration-color: currentColor;
   }
 }
 
@@ -696,7 +703,7 @@ button[aria-disabled='true'] {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-sm) var(--space-lg);
-  padding-bottom: var(--space-sm);
+  padding-bottom: var(--space-md);
   border-bottom: var(--border);
 }
 
@@ -728,18 +735,17 @@ button[aria-disabled='true'] {
   color: var(--text-muted);
 }
 
-/* The bar's own control. This was six inline properties repeated on each of
-   the three selects, which is three places to edit for one change — and the
-   2px border is a real tier of this system (`.status-badge` and the output
-   table headers use it too) that was never given a name. */
+/* The bar's own control, named once rather than repeated inline on each
+   select. */
 .options-bar__select {
-  min-height: 44px;
-  padding: 2px var(--space-sm);
-  border: 2px solid var(--border-color);
-  background: var(--bg-secondary);
+  min-height: 36px;
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
   color: var(--text-main);
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: 0.8125rem;
+  font-weight: 500;
   /* No fixed width. A resolution key or a translated "keep original" is as
      long as it is, and the bar wraps to fit it. */
   max-width: 100%;
@@ -754,12 +760,12 @@ button[aria-disabled='true'] {
 
 .status-badge {
   display: inline-block;
-  padding: 2px 6px;
-  border: 2px solid var(--border-color);
-  font-size: 0.65rem;
-  font-weight: 900;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  padding: 0 6px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 18px;
   white-space: nowrap;
   /* A step going from running to done should read as the same badge changing,
      not a new one replacing it. */
@@ -775,23 +781,15 @@ button[aria-disabled='true'] {
   gap: var(--space-sm);
   width: 100%;
   min-height: 44px;
-  padding: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
   border: var(--border);
-  background: var(--bg);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
   color: var(--text);
-  font-weight: 900;
-  font-size: 0.9rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  font-weight: 500;
+  font-size: 0.875rem;
+  text-align: start;
   cursor: pointer;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .panel-button:hover {
-    background: var(--btn-hover-bg);
-    color: var(--btn-hover-text);
-    transform: translate(2px, 2px);
-  }
 }
 
 /* Disclosure for the caption adjustments. The marker is replaced with a
@@ -804,12 +802,10 @@ button[aria-disabled='true'] {
   gap: var(--space-sm);
   min-height: 44px;
   padding: var(--space-sm) 0;
-  border-top: 2px solid var(--border-color);
+  border-top: var(--border);
   cursor: pointer;
-  font-weight: 900;
-  font-size: 0.7rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  font-weight: 500;
+  font-size: 0.8125rem;
   list-style: none;
 }
 
@@ -818,32 +814,23 @@ button[aria-disabled='true'] {
 }
 
 .caption-tuning > summary::after {
-  content: '▼';
-  font-size: 0.65rem;
-  margin-inline-start: auto;
+  content: '';
+  width: 6px;
+  height: 6px;
+  margin-inline: auto 4px;
+  border-right: 1.5px solid var(--text-muted);
+  border-bottom: 1.5px solid var(--text-muted);
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 150ms var(--ease-out-quart);
 }
 
 .caption-tuning[open] > summary::after {
-  content: '▲';
+  transform: translateY(1px) rotate(-135deg);
 }
 
 /* The badge sits before the marker, so the marker keeps the trailing edge. */
 .caption-tuning > summary .status-badge {
   margin-inline-start: 0;
-}
-
-.brutalist-card {
-  border: var(--border);
-  background: var(--bg);
-  padding: var(--space-md);
-}
-
-.brutalist-card-interactive {
-  border: var(--border);
-  background: var(--bg);
-  padding: var(--space-md);
-  transition: all 200ms var(--ease-out-quart);
-  cursor: pointer;
 }
 
 /* Layout
@@ -965,8 +952,8 @@ button[aria-disabled='true'] {
    page, a link in a row of settings and a lone button at the foot; they are
    chrome, and they live with the navigation now.
 
-   Sized like the nav buttons beside them — ghost, uppercase, 44px — because
-   that is what they are now. */
+   Sized like the nav buttons beside them, because that is what they are
+   now: quiet text buttons that only take a surface on hover. */
 .project-actions {
   display: flex;
   flex-wrap: wrap;
@@ -979,31 +966,39 @@ button[aria-disabled='true'] {
   display: inline-flex;
   align-items: center;
   gap: var(--space-sm);
-  min-height: 44px;
+  min-height: 36px;
   padding: 0 var(--space-md);
-  border: var(--border);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
   background: transparent;
-  color: var(--text);
-  font-weight: 900;
-  font-size: 0.75rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 0.875rem;
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
-  transition: transform 200ms var(--ease-out-quart), background 200ms var(--ease-out-quart), color 200ms var(--ease-out-quart);
+}
+
+@media (pointer: coarse) {
+  .nav-action {
+    min-height: 44px;
+  }
+}
+
+.nav-action[aria-expanded='true'] {
+  background: var(--bg-secondary);
+  color: var(--text);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .nav-action:not(:disabled):hover {
-    background: var(--btn-hover-bg);
-    color: var(--btn-hover-text);
-    transform: translate(2px, 2px);
+    background: var(--bg-secondary);
+    color: var(--text);
   }
 
   .nav-action--danger:not(:disabled):hover {
-    background: var(--error);
-    color: var(--bg);
+    background: color-mix(in srgb, var(--error) 10%, transparent);
+    color: var(--error);
   }
 }
 
@@ -1016,7 +1011,6 @@ button[aria-disabled='true'] {
 
 .nav-action--danger {
   color: var(--error);
-  border-color: var(--error);
 }
 
 /* Hangs over the page rather than pushing it down: this is a menu in the
@@ -1028,10 +1022,11 @@ button[aria-disabled='true'] {
   inset-inline-end: 0;
   z-index: 30;
   min-width: min(560px, 90vw);
-  padding: var(--space-md);
+  padding: var(--space-lg);
   border: var(--border);
-  background: var(--bg);
-  box-shadow: 4px 4px 0px var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-float);
 }
 
 /* The writing is long-form — a highlight's hook and quote and three social
@@ -1066,7 +1061,7 @@ button[aria-disabled='true'] {
   justify-content: space-between;
   gap: var(--space-md);
   border-top: var(--border);
-  padding-top: var(--space-md);
+  padding-top: var(--space-lg);
   margin-top: var(--space-xl);
 }
 
@@ -1076,32 +1071,58 @@ button[aria-disabled='true'] {
   gap: var(--space-sm);
   color: inherit;
   text-decoration: none;
-  transition: transform 200ms var(--ease-out-quart);
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .wordmark-link:hover {
-    transform: scale(1.02);
-  }
+.wordmark-link svg {
+  color: var(--accent);
 }
 
 /* The wordmark looks like a title but isn't one: it repeats on every route,
    so it must not compete with the actual page heading. */
 .wordmark {
-  /* Was clamp(2rem, 5vw, 4rem): the same 5vw as a page h1 but a higher cap, so
-     it matched the project title below 960px and beat it above. Persistent
-     chrome should never be the largest thing on a page it repeats on. This
-     also puts it in proportion with the 24px mark beside it. */
-  font-size: clamp(1.25rem, 2.5vw, 1.75rem);
-  font-weight: 900;
-  letter-spacing: -0.02em;
-  text-transform: uppercase;
+  font-size: 1rem;
+  font-weight: 600;
   line-height: 1;
   margin: 0;
 }
 
+.project-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: var(--space-lg);
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-raised);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  animation: entrance 300ms var(--ease-out-quart) backwards;
+  transition: border-color 150ms var(--ease-out-quart);
+}
+
+.project-card__open {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--text-muted);
+  transition: color 150ms var(--ease-out-quart);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .project-card:hover {
+    border-color: var(--hairline-strong);
+  }
+
+  .project-card:hover .project-card__open {
+    color: var(--accent);
+  }
+}
+
 .skeleton-block {
   background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
 }
 
 .app-header {
@@ -1111,8 +1132,9 @@ button[aria-disabled='true'] {
   justify-content: space-between;
   align-items: center;
   width: 100%;
+  min-height: 56px;
   border-bottom: var(--border);
-  padding-bottom: var(--space-sm);
+  padding: var(--space-sm) 0;
 }
 
 /* Project actions and the primary nav share the trailing edge. They wrap
@@ -1128,9 +1150,8 @@ button[aria-disabled='true'] {
 
 /* Motion
    ------------------------------------------------------------------------
-   Several animations here run indefinitely (sheen for the whole duration of
-   a pipeline step, pulse while clips generate). Those are the ones that
-   matter most to suppress. */
+   The live dot on a running step and the spinner run indefinitely; those are
+   the ones that matter most to suppress. */
 
 @media (prefers-reduced-motion: reduce) {
   *,

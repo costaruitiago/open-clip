@@ -133,7 +133,7 @@ describe('PipelineController', () => {
     renderController();
 
     // `chapters` errored, so the aggregate must not read as completed.
-    expect(screen.getByRole('button', { name: /AI Steps/i }).style.background).toBe('var(--error)');
+    expect(screen.getByRole('button', { name: /AI Steps/i }).style.color).toBe('var(--error)');
   });
 
   // A step that filed one draft out of twenty used to paint itself green and
@@ -157,7 +157,7 @@ describe('PipelineController', () => {
       render(<PipelineController onExecute={vi.fn()} steps={partial} />);
 
       const button = screen.getByRole('button', { name: /Postiz/i });
-      expect(button.style.background).toBe('var(--warning)');
+      expect(button.style.getPropertyValue('--step-dot')).toBe('var(--warning)');
       expect(button.className).not.toContain('pipeline-step-success');
     });
 
@@ -190,9 +190,9 @@ describe('PipelineController', () => {
         />
       );
 
-      expect(screen.getByRole('button', { name: /AI Steps/i }).style.background).toBe(
-        'var(--warning)'
-      );
+      expect(
+        screen.getByRole('button', { name: /AI Steps/i }).style.getPropertyValue('--step-dot')
+      ).toBe('var(--warning)');
     });
   });
 });

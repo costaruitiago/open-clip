@@ -66,26 +66,16 @@ const stepColors = (status: StepStatus) => {
   // state the user is meant to act on, and it has to be told apart from both
   // the state that needs nothing and the state that produced nothing.
   const isPartial = status === 'partial';
+  // Neutral surfaces with a status dot (see index.css), so the row is not a
+  // strip of five fills competing with the clips. Only the two states that
+  // ask for attention, running and failed, tint the whole button.
+  const tint = isError ? 'var(--error)' : isRunning ? 'var(--accent)' : null;
   return {
-    background: isError
-      ? 'var(--error)'
-      : isPartial
-        ? 'var(--warning)'
-        : isExecuted
-          ? 'var(--success)'
-          : isRunning
-            ? 'var(--accent)'
-            : 'var(--bg)',
-    color: isError
-      ? 'var(--bg)'
-      : isPartial
-        ? 'var(--on-warning)'
-        : isExecuted
-          ? 'var(--on-success)'
-          : isRunning
-            ? 'var(--bg)'
-            : 'var(--text)',
-  };
+    background: tint ? `color-mix(in srgb, ${tint} 8%, var(--bg-raised))` : 'var(--bg-raised)',
+    borderColor: tint ? `color-mix(in srgb, ${tint} 35%, transparent)` : 'var(--hairline)',
+    color: tint ?? 'var(--text)',
+    '--step-dot': isPartial ? 'var(--warning)' : isExecuted ? 'var(--success)' : 'var(--hairline-strong)',
+  } as React.CSSProperties;
 };
 
 /**
@@ -133,15 +123,14 @@ const stepButtonStyle = (
     // is exactly what the compact row is trading away for the fold.
     minHeight: isCompact ? '44px' : '60px',
     whiteSpace: isCompact ? 'nowrap' : undefined,
-    border: 'var(--border)',
+    border: 'var(--border)', borderRadius: 'var(--radius)',
     ...stepColors(status),
-    opacity: isLocked ? 0.3 : 1,
+    opacity: isLocked ? 0.5 : 1,
     cursor: isLocked ? 'not-allowed' : 'pointer',
-    transition: 'all 200ms var(--ease-out-quart)',
+    transition: 'background-color 150ms var(--ease-out-quart), border-color 150ms var(--ease-out-quart), color 150ms var(--ease-out-quart)',
     position: 'relative',
     overflow: 'hidden',
-    boxShadow: isHovered && !isLocked ? '4px 4px 0px var(--border-color)' : 'none',
-    textTransform: 'uppercase',
+    ...(isHovered && !isLocked && { background: 'var(--btn-hover-bg)' }),
   };
 };
 
@@ -268,13 +257,17 @@ const LlmStepMenu: React.FC<{
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-controls={isOpen ? menuId : undefined}
+        className="pipeline-step"
         style={stepButtonStyle(status, isOpen, isCompact)}
       >
         {/* "LLM Queries" named the implementation. These are the steps where a
             model writes something, which is what the user is choosing between. */}
-        <span style={{ fontWeight: 900, fontSize: isCompact ? '0.8rem' : '1rem', letterSpacing: '0.5px' }}>
-          AI Steps {isPinned ? '▲' : '▼'}
+        <span style={{ fontWeight: 500, fontSize: isCompact ? '0.8rem' : '1rem'}}>
+          AI steps
         </span>
+        <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isPinned ? 'rotate(180deg)' : undefined, transition: 'transform 150ms var(--ease-out-quart)', color: 'var(--text-muted)' }}>
+          <path d="m6 9 6 6 6-6" />
+        </svg>
       </button>
 
       {isOpen && (
@@ -296,9 +289,9 @@ const LlmStepMenu: React.FC<{
             // Last resort for a viewport narrower than the menu's own minimum.
             maxWidth: 'calc(100vw - var(--space-xl))',
             zIndex: 20,
-            border: 'var(--border)',
+            border: 'var(--border)', borderRadius: 'var(--radius-lg)',
             background: 'var(--bg)',
-            boxShadow: '4px 4px 0px var(--border-color)',
+            boxShadow: 'var(--shadow-float)',
           }}
         >
           {steps.map((step) => {
@@ -317,13 +310,12 @@ const LlmStepMenu: React.FC<{
                   gap: 'var(--space-md)',
                   padding: 'var(--space-sm)',
                   border: 'none',
-                  borderBottom: '2px solid var(--border-color)',
+                  borderBottom: 'var(--border)',
                   background: 'transparent',
                   color: 'var(--text)',
                   cursor: isLocked ? 'not-allowed' : 'pointer',
                   opacity: isLocked ? 0.4 : 1,
-                  textTransform: 'uppercase',
-                  fontWeight: 700,
+                  fontWeight: 500,
                   fontSize: '0.8rem',
                   textAlign: 'left',
                 }}
@@ -398,20 +390,19 @@ const PipelineControllerRow: React.FC<PipelineControllerProps> = ({ onExecute, s
         width: isCompact ? 'auto' : '100%',
         padding: isCompact ? '0 var(--space-md)' : 'var(--space-sm)',
         minHeight: '44px',
-        border: 'var(--border)',
+        border: 'var(--border)', borderRadius: 'var(--radius)',
         // Ghost once the project has clips in it. A filled black bar is a
         // promise that this is the thing to press, and on a finished
         // project pressing it re-runs everything.
         backgroundColor: isCompact ? 'transparent' : 'var(--text)',
         color: isCompact ? 'var(--text)' : 'var(--bg)',
-        fontWeight: 900,
+        fontWeight: 500,
         fontSize: isCompact ? '0.8rem' : '1rem',
-        textTransform: 'uppercase',
         whiteSpace: isCompact ? 'nowrap' : undefined,
         cursor: anyRunning ? 'not-allowed' : 'pointer',
         opacity: anyRunning ? 0.5 : 1,
         textAlign: 'center',
-        transition: 'all 200ms var(--ease-out-quart)',
+        transition: 'background-color 150ms var(--ease-out-quart), border-color 150ms var(--ease-out-quart), color 150ms var(--ease-out-quart)',
       }}
     >
       {anyRunning ? 'Pipeline running…' : 'Run full pipeline'}
@@ -438,17 +429,17 @@ const PipelineControllerRow: React.FC<PipelineControllerProps> = ({ onExecute, s
         onPointerEnter={(event) => isHoverPointer(event) && setHoveredStep(step.name)}
         onPointerLeave={(event) => isHoverPointer(event) && setHoveredStep(null)}
         aria-busy={isRunning}
-        className={`pipeline-step-btn ${isRunning ? 'pipeline-step-running' : ''} ${isStepDone(step.status) ? 'pipeline-step-success' : ''} ${step.status === 'error' ? 'pipeline-step-error' : ''}`}
+        className={`pipeline-step-btn ${isRunning ? 'pipeline-step-running' : ''} ${isStepDone(step.status) ? 'pipeline-step-success' : ''} ${step.status === 'error' ? 'pipeline-step-error' : ''} pipeline-step`}
         style={stepButtonStyle(step.status, isHovered, isCompact)}
       >
-        <span style={{ fontWeight: 900, fontSize: isCompact ? '0.8rem' : '1rem', letterSpacing: '0.5px' }}>
+        <span style={{ fontWeight: 500, fontSize: isCompact ? '0.8rem' : '1rem'}}>
           {step.label}
         </span>
         {/* No opacity here. This label is the reason status is not
             colour-only (see statusLabel), and fading it to 0.85 over the
             accent fill put it at 3.4:1 — below the threshold it exists
             to satisfy. */}
-        <span style={{ fontWeight: 700, fontSize: '0.65rem', letterSpacing: '0.5px' }}>
+        <span style={{ fontWeight: 500, fontSize: '0.75rem'}}>
           {statusLabel(step)}
         </span>
       </button>
@@ -561,13 +552,13 @@ export const PipelineActivity: React.FC<PipelineActivityProps> = ({ steps, activ
           key={step.name}
           style={{
             margin: 0,
-            fontSize: '0.7rem',
-            fontWeight: 700,
+            fontSize: '0.75rem',
+            fontWeight: 500,
             lineHeight: 1.4,
             color: 'var(--text-muted)',
           }}
         >
-          <span style={{ color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <span style={{ color: 'var(--accent)'}}>
             {step.label} · {elapsed(clock - entry.since)}
           </span>
           {/* Until something inside the step reports, the elapsed time is the
@@ -580,8 +571,8 @@ export const PipelineActivity: React.FC<PipelineActivityProps> = ({ steps, activ
           key={step.name}
           style={{
             margin: 0,
-            fontSize: '0.7rem',
-            fontWeight: 700,
+            fontSize: '0.75rem',
+            fontWeight: 500,
             lineHeight: 1.4,
             // The reason is the message, so it carries the colour rather than
             // only the step name in front of it.
@@ -589,7 +580,7 @@ export const PipelineActivity: React.FC<PipelineActivityProps> = ({ steps, activ
             overflowWrap: 'anywhere',
           }}
         >
-          <span style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <span style={{ fontWeight: 500 }}>
             {step.label} stopped
           </span>
           {` — ${step.error}`}
@@ -600,14 +591,14 @@ export const PipelineActivity: React.FC<PipelineActivityProps> = ({ steps, activ
           key={step.name}
           style={{
             margin: 0,
-            fontSize: '0.7rem',
-            fontWeight: 700,
+            fontSize: '0.75rem',
+            fontWeight: 500,
             lineHeight: 1.4,
             color: 'var(--warning-text)',
             overflowWrap: 'anywhere',
           }}
         >
-          <span style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <span style={{ fontWeight: 500 }}>
             {step.label} partly done
           </span>
           {` — ${step.error}`}

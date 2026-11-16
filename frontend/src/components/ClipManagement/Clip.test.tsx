@@ -82,7 +82,7 @@ describe('Clip Component', () => {
       // Following the project: the plain card, no colour at all.
       const button = await screen.findByLabelText('Caption settings, following the project');
       expect(statesOf(button).background).toBe('');
-      expect(statesOf(button).color).toBe('var(--text)');
+      expect(statesOf(button).color).toBe('');
     });
   });
 
@@ -207,7 +207,7 @@ describe('Clip Component', () => {
 
       expect(uploadClip).not.toHaveBeenCalled();
       expect(screen.getByRole('dialog')).toHaveTextContent(/How they lost it all/);
-      fireEvent.click(screen.getByRole('button', { name: 'UPLOAD' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Upload' }));
       await waitFor(() => expect(uploadClip).toHaveBeenCalledWith('test-project-123', 0));
     });
 
@@ -486,7 +486,7 @@ describe('Clip Component', () => {
         'Published from Postiz; import again to post it a second time'
       );
       expect(button).toBeInTheDocument();
-      expect(button.style.backgroundColor).toBe('var(--success)');
+      expect(button.style.color).toBe('var(--success)');
     });
 
     it('says when Postiz could not send one', () => {

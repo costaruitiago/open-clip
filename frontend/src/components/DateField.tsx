@@ -115,9 +115,9 @@ export const DateField: React.FC<DateFieldProps> = ({
             /* Firefox has no picker to show, and the field is still typeable. */
           }
         }}
-        style={{ padding: '0 var(--space-sm)', minHeight: '44px', cursor: 'pointer' }}
+        style={{ padding: '0 var(--space-sm)', minHeight: '44px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', color: 'var(--text-secondary)' }}
       >
-        📅
+        <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
       </button>
     </div>
   );

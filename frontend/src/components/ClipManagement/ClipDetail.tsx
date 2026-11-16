@@ -44,7 +44,7 @@ const DeadEnd: React.FC<{
     role="alert"
     style={{
       width: '100%',
-      border: 'var(--border-width) solid var(--error)',
+      border: '1px solid color-mix(in srgb, var(--error) 40%, transparent)',
       padding: 'var(--space-md)',
       display: 'flex',
       flexDirection: 'column',
@@ -52,7 +52,7 @@ const DeadEnd: React.FC<{
       alignItems: 'flex-start',
     }}
   >
-    <strong style={{ fontWeight: 900, textTransform: 'uppercase' }}>{title}</strong>
+    <strong style={{ fontWeight: 500}}>{title}</strong>
     {/* Not uppercased and free to break anywhere: this is a server message,
         which may be a full sentence, an identifier, or a URL. */}
     {detail && <span style={{ overflowWrap: 'anywhere' }}>{detail}</span>}
@@ -79,10 +79,8 @@ const DeadEnd: React.FC<{
  */
 const fieldLabelStyle: React.CSSProperties = {
   display: 'block',
-  fontSize: '0.65rem',
-  fontWeight: 900,
-  letterSpacing: '0.05em',
-  textTransform: 'uppercase',
+  fontSize: '0.75rem',
+  fontWeight: 500,
   color: 'var(--text-muted)',
   marginBottom: 'var(--space-sm)',
 };
@@ -349,7 +347,7 @@ export const ClipDetail: React.FC = () => {
               role="status"
               style={{
                 padding: 'var(--space-xl)',
-                border: 'var(--border-width) dashed var(--border-color)',
+                border: '1px dashed var(--hairline-strong)', borderRadius: 'var(--radius-lg)',
                 textAlign: 'center',
                 fontSize: '0.8rem',
               }}

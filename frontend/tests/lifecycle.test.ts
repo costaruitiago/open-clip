@@ -6,7 +6,7 @@ test.describe('Project Lifecycle - UI Validation', () => {
     await page.goto('/');
 
     // Verify critical upload UI elements are visible
-    await expect(page.getByText('Upload Video')).toBeVisible();
+    await expect(page.getByText('Drop a recording to cut it into clips')).toBeVisible();
     
     // Verify FileUploader is rendered correctly (non-destructive check)
     const fileUploader = page.locator('input[type="file"]');

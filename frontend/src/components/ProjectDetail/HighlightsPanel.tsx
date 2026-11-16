@@ -105,17 +105,15 @@ export const HighlightsPanel: React.FC<HighlightsPanelProps> = ({
   );
 
   const labelStyle: React.CSSProperties = {
-    fontWeight: 900,
-    fontSize: '0.65rem',
-    letterSpacing: '0.05em',
-    textTransform: 'uppercase',
+    fontWeight: 500,
+    fontSize: '0.75rem',
   };
 
   const fieldStyle: React.CSSProperties = {
     padding: 'var(--space-sm)',
     background: 'var(--bg)',
     color: 'var(--text)',
-    border: 'var(--border)',
+    border: 'var(--border)', borderRadius: 'var(--radius-lg)',
     fontFamily: 'inherit',
     fontSize: '0.85rem',
     width: '100%',
@@ -123,7 +121,7 @@ export const HighlightsPanel: React.FC<HighlightsPanelProps> = ({
   };
 
   const hintStyle: React.CSSProperties = {
-    fontSize: '0.7rem',
+    fontSize: '0.75rem',
     color: 'var(--text-muted)',
     lineHeight: 1.4,
   };

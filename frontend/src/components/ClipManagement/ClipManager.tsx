@@ -51,11 +51,11 @@ const ClipGrid: React.FC<ClipManagerProps> = ({ projectId, clips, belowClips = [
         alignItems: 'center',
         justifyContent: 'center',
         padding: 'var(--space-xl)',
-        border: 'var(--border-width) dashed var(--border-color)',
+        border: '1px dashed var(--hairline-strong)', borderRadius: 'var(--radius-lg)',
         textAlign: 'center',
         backgroundColor: 'var(--bg)'
       }}>
-        <h2 style={{ fontSize: '2rem', fontWeight: 900, margin: '0 0 var(--space-sm) 0', textTransform: 'uppercase' }}>
+        <h2 style={{ fontSize: '2rem', fontWeight: 500, margin: '0 0 var(--space-sm) 0'}}>
           No Clips Yet
         </h2>
         <p style={{ fontSize: '1.1rem', maxWidth: '500px', marginBottom: 'var(--space-lg)', lineHeight: '1.4' }}>
@@ -64,8 +64,8 @@ const ClipGrid: React.FC<ClipManagerProps> = ({ projectId, clips, belowClips = [
         </p>
         <div style={{
           padding: 'var(--space-sm) var(--space-md)',
-          border: 'var(--border)',
-          fontWeight: 900,
+          border: 'var(--border)', borderRadius: 'var(--radius-lg)',
+          fontWeight: 500,
           fontSize: '1.2rem',
           // Three nudges, then still. Looping forever is motion that starts
           // automatically and never stops, which WCAG 2.2.2 asks for a pause
@@ -127,12 +127,11 @@ const ClipGrid: React.FC<ClipManagerProps> = ({ projectId, clips, belowClips = [
               alignSelf: 'flex-start',
               minHeight: '44px',
               padding: '0 var(--space-md)',
-              border: 'var(--border)',
+              border: 'var(--border)', borderRadius: 'var(--radius)',
               background: 'transparent',
               color: 'var(--text)',
-              fontWeight: 900,
+              fontWeight: 500,
               fontSize: '0.8rem',
-              textTransform: 'uppercase',
               cursor: 'pointer',
             }}
           >

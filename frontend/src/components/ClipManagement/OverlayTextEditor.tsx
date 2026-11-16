@@ -208,7 +208,7 @@ export const OverlayTextEditor: React.FC<OverlayTextEditorProps> = ({
         >
           <div
             style={{
-              border: 'var(--border)',
+              border: 'var(--border)', borderRadius: 'var(--radius-lg)',
               marginInline: 'auto',
               // The whole frame shrinks, so the overlay shrinks with it: every
               // size on a title is a percentage of the frame, and the preview

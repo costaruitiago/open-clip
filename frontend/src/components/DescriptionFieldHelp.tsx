@@ -26,7 +26,7 @@ export const DescriptionFieldHelp: React.FC<DescriptionFieldHelpProps> = ({ extr
 
   return (
     <details style={{ fontSize: '0.75rem' }}>
-      <summary style={{ cursor: 'pointer', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+      <summary style={{ cursor: 'pointer', fontWeight: 500}}>
         Available fields
       </summary>
       <p style={{ margin: 'var(--space-sm) 0', color: 'var(--text-muted)', lineHeight: 1.4 }}>
@@ -36,7 +36,7 @@ export const DescriptionFieldHelp: React.FC<DescriptionFieldHelpProps> = ({ extr
       <dl style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
         {fields.map((item) => (
           <div key={item.field} style={{ borderTop: 'var(--border)', paddingTop: 'var(--space-sm)' }}>
-            <dt style={{ fontFamily: 'monospace', fontWeight: 700, overflowWrap: 'anywhere' }}>
+            <dt style={{ fontFamily: 'monospace', fontWeight: 500, overflowWrap: 'anywhere' }}>
               {`{${item.field}}`}
             </dt>
             <dd style={{ margin: 0, color: 'var(--text-muted)' }}>{item.description}</dd>

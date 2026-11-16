@@ -18,6 +18,6 @@ test.describe('Component Integrity & Smoke Test Battery', () => {
   });
 
   test('FileUploader is present', async ({ page }) => {
-    await expect(page.getByText('Upload Video')).toBeVisible();
+    await expect(page.getByText('Drop a recording to cut it into clips')).toBeVisible();
   });
 });

@@ -116,7 +116,7 @@ export const OverlayStyler: React.FC<OverlayStylerProps> = ({ projectId, overlay
             <span>Overlay titles</span>
             {badge}
           </button>
-          <p style={{ margin: 'var(--space-sm) 0 0 0', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+          <p style={{ margin: 'var(--space-sm) 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
             {`${current.font_family} · ${current.font_size_pct}% of frame · ${current.position_pct}% from top`}
             {' · how every title in this project is drawn'}
           </p>

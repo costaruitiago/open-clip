@@ -75,12 +75,10 @@ export const EndScreenPanel: React.FC<EndScreenPanelProps> = ({ projectId, setti
   };
 
   const labelStyle: React.CSSProperties = {
-    fontWeight: 900,
-    fontSize: '0.65rem',
-    letterSpacing: '0.05em',
-    textTransform: 'uppercase',
+    fontWeight: 500,
+    fontSize: '0.75rem',
   };
-  const hintStyle: React.CSSProperties = { fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.3 };
+  const hintStyle: React.CSSProperties = { fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.3 };
   const columnStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' };
 
   const fileField = (kind: EndScreenFileKind, id: string, label: string, hint: string) => {

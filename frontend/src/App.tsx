@@ -264,10 +264,10 @@ export default function App() {
 
   // Generate Breadcrumbs
   const breadcrumbs: { label: string; onClick?: () => void }[] = [];
-  breadcrumbs.push({ label: 'HOME', onClick: () => navigate('/') });
+  breadcrumbs.push({ label: 'Home', onClick: () => navigate('/') });
 
   if (location.pathname !== '/') {
-    breadcrumbs.push({ label: 'PROJECTS', onClick: () => navigate('/history') });
+    breadcrumbs.push({ label: 'Projects', onClick: () => navigate('/history') });
   }
 
   if (projectId) {
@@ -278,13 +278,15 @@ export default function App() {
   }
 
   if (clipIndex) {
-    breadcrumbs.push({ label: `CLIP ${parseInt(clipIndex) + 1}` });
+    breadcrumbs.push({ label: `Clip ${parseInt(clipIndex) + 1}` });
   }
 
   return (
     <div
       style={{
-        padding: 'var(--space-md)',
+        padding: '0 var(--space-xl) var(--space-xl)',
+        maxWidth: '1600px',
+        margin: '0 auto',
         display: 'flex', 
         flexDirection: 'column',
         minHeight: '100vh',
@@ -302,7 +304,7 @@ export default function App() {
           display: 'flex', 
           flexDirection: 'column',
           width: '100%',
-          marginBottom: 'var(--space-sm)',
+          marginBottom: 'var(--space-xs)',
         }}>
           <div className="app-header">
             <Header />
@@ -353,16 +355,15 @@ export default function App() {
                   <div
                     role="alert"
                     style={{
-                      border: '4px solid var(--error)',
+                      border: '1px solid color-mix(in srgb, var(--error) 40%, transparent)',
                       padding: 'var(--space-md)',
                       backgroundColor: 'var(--bg)',
                       color: 'var(--error)',
-                      boxShadow: '4px 4px 0px var(--error)',
                       textAlign: 'left',
                       animation: 'entrance 400ms var(--ease-out-quart)'
                     }}
                   >
-                    <strong style={{ display: 'block', fontWeight: 900, textTransform: 'uppercase', marginBottom: '4px' }}>
+                    <strong style={{ display: 'block', fontWeight: 500, marginBottom: '4px' }}>
                       Could not create project
                     </strong>
                     {/* Not uppercased: this is a server message and may be a
@@ -389,7 +390,7 @@ export default function App() {
                     key={failure.what}
                     role="alert"
                     style={{
-                      border: '4px solid var(--error)',
+                      border: '1px solid color-mix(in srgb, var(--error) 40%, transparent)',
                       padding: 'var(--space-sm) var(--space-md)',
                       color: 'var(--error)',
                       display: 'flex',
@@ -399,12 +400,12 @@ export default function App() {
                       justifyContent: 'space-between',
                     }}
                   >
-                    <span style={{ fontWeight: 700, overflowWrap: 'anywhere' }}>
+                    <span style={{ fontWeight: 500, overflowWrap: 'anywhere' }}>
                       {failure.what} {failure.detail}
                     </span>
                     <button
                       onClick={failure.dismiss}
-                      style={{ border: '4px solid var(--error)', color: 'var(--error)', padding: '0.5rem 1rem', minHeight: '44px' }}
+                      style={{ border: '1px solid color-mix(in srgb, var(--error) 40%, transparent)', color: 'var(--error)', padding: '0.5rem 1rem', minHeight: '44px' }}
                     >
                       Dismiss
                     </button>
@@ -428,8 +429,8 @@ export default function App() {
                     onDeleteClip={handleDeleteClip}
                   />
                 ) : projectError ? (
-                  <div role="alert" style={{ border: '4px solid var(--error)', padding: 'var(--space-md)', display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)', alignItems: 'flex-start' }}>
-                    <strong style={{ fontWeight: 900, textTransform: 'uppercase' }}>Could not load this project</strong>
+                  <div role="alert" style={{ border: '1px solid color-mix(in srgb, var(--error) 40%, transparent)', padding: 'var(--space-md)', display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)', alignItems: 'flex-start' }}>
+                    <strong style={{ fontWeight: 500}}>Could not load this project</strong>
                     <span style={{ overflowWrap: 'anywhere' }}>
                       {projectError instanceof Error ? projectError.message : 'Please try again.'}
                     </span>

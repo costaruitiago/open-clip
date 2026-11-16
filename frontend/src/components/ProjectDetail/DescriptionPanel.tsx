@@ -62,17 +62,15 @@ export const DescriptionPanel: React.FC<DescriptionPanelProps> = ({ projectId, s
     padding: 'var(--space-sm)',
     background: 'var(--bg)',
     color: 'var(--text)',
-    border: 'var(--border)',
+    border: 'var(--border)', borderRadius: 'var(--radius-lg)',
     fontFamily: 'inherit',
     fontSize: '0.85rem',
     width: '100%',
   };
 
   const labelStyle: React.CSSProperties = {
-    fontWeight: 900,
-    fontSize: '0.65rem',
-    letterSpacing: '0.05em',
-    textTransform: 'uppercase',
+    fontWeight: 500,
+    fontSize: '0.75rem',
   };
 
   const field = (
@@ -103,7 +101,7 @@ export const DescriptionPanel: React.FC<DescriptionPanelProps> = ({ projectId, s
           style={fieldStyle}
         />
       )}
-      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.3 }}>{hint}</span>
+      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.3 }}>{hint}</span>
     </div>
   );
 
@@ -129,7 +127,7 @@ export const DescriptionPanel: React.FC<DescriptionPanelProps> = ({ projectId, s
             <span>Description</span>
             {badge}
           </button>
-          <p style={{ margin: 'var(--space-sm) 0 0 0', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+          <p style={{ margin: 'var(--space-sm) 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
             {stored.source_url
               ? `Shorts link back to ${stored.source_title || 'the original video'}`
               : 'Add the original video so every short can point back to it'}

@@ -178,7 +178,7 @@ export const ClipActions: React.FC<ClipActionsProps> = ({
       {isUploading && (
         // The job is the backend's, so a user who navigates away has not
         // cancelled a publish halfway through.
-        <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+        <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
           Cutting the clip again, then publishing it. This keeps going if you leave the page.
         </p>
       )}
@@ -186,7 +186,7 @@ export const ClipActions: React.FC<ClipActionsProps> = ({
         // The published video, named as such. Publishing cannot be undone from
         // here, so the page has to show that it already happened rather than
         // leaving the button looking untouched.
-        <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--text-muted)', overflowWrap: 'anywhere' }}>
+        <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)', overflowWrap: 'anywhere' }}>
           Published:{' '}
           <a href={youtubeUrl} target="_blank" rel="noreferrer">
             {youtubeUrl}
@@ -198,7 +198,7 @@ export const ClipActions: React.FC<ClipActionsProps> = ({
         // looks the same whether the video is private forever, unlisted, or
         // waiting for an hour that has been chosen — and only one of those
         // means anybody will ever see it without being sent the URL.
-        <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+        <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
           {youtubePrivacy === 'schedule' && youtubePublishAt
             ? `Private until ${formatPublishAt(youtubePublishAt)}, when YouTube publishes it.`
             : youtubePrivacy === 'unlisted'
@@ -212,7 +212,7 @@ export const ClipActions: React.FC<ClipActionsProps> = ({
         // it, and the link in the description does not create it — so the step
         // is named here rather than left to be discovered as a thing that did
         // not happen.
-        <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--text-muted)', overflowWrap: 'anywhere' }}>
+        <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)', overflowWrap: 'anywhere' }}>
           YouTube only lets the related video be attached in Studio, so the link
           back to the full episode has to be set there:{' '}
           <a href={getStudioEditUrl(youtubeVideoId)} target="_blank" rel="noreferrer">
@@ -240,7 +240,7 @@ export const ClipActions: React.FC<ClipActionsProps> = ({
             : 'Import to Postiz'}
       </Button>
       {isImporting && (
-        <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+        <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
           Cutting the clip again, then filing it in Postiz. This keeps going if you leave the page.
         </p>
       )}
@@ -249,7 +249,7 @@ export const ClipActions: React.FC<ClipActionsProps> = ({
         // went out an hour ago said "waiting in Postiz" forever until the sync
         // existed, and a live post is exactly the thing a second import would
         // duplicate.
-        <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--text-muted)', overflowWrap: 'anywhere' }}>
+        <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)', overflowWrap: 'anywhere' }}>
           {postizState === 'published'
             ? 'Published from Postiz'
             : postizState === 'scheduled'
@@ -268,7 +268,7 @@ export const ClipActions: React.FC<ClipActionsProps> = ({
         // list of the published ones alone silently loses the others: a clip
         // filed to two accounts and published on one showed a single name, and
         // nothing said the second account existed, let alone what it was doing.
-        <ul style={{ margin: 0, paddingLeft: '1.1rem', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+        <ul style={{ margin: 0, paddingLeft: '1.1rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
           {postizChannels.map((channel) => (
             <li key={channel.id} style={{ overflowWrap: 'anywhere' }}>
               {channel.url ? (
@@ -323,7 +323,7 @@ export const ClipActions: React.FC<ClipActionsProps> = ({
               border: `var(--border-width) solid ${actionResult.ok ? 'var(--success)' : 'var(--error)'}`,
               color: actionResult.ok ? 'var(--text)' : 'var(--error)',
               fontSize: '0.8rem',
-              fontWeight: 900,
+              fontWeight: 500,
             }}
           >
             {/* A server message can be a sentence or a bare identifier, and it
@@ -341,10 +341,10 @@ export const ClipActions: React.FC<ClipActionsProps> = ({
                 background: 'transparent',
                 color: 'inherit',
                 cursor: 'pointer',
-                fontWeight: 900,
+                fontWeight: 500,
               }}
             >
-              ✕
+              <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
             </button>
           </div>
         )}
@@ -370,7 +370,7 @@ export const ClipActions: React.FC<ClipActionsProps> = ({
             : '',
           'It goes to your channel straight away and cannot be taken down from here.',
         ].filter(Boolean).join(' ')}
-        confirmText="UPLOAD"
+        confirmText="Upload"
         onConfirm={handleUpload}
         onCancel={() => setIsConfirming(false)}
       />

@@ -11,6 +11,6 @@ describe('Header Component', () => {
       </MemoryRouter>
     );
     
-    expect(screen.getByText(/OPEN CLIP/i)).toBeDefined();
+    expect(screen.getByText(/Open Clip/)).toBeDefined();
   });
 });
